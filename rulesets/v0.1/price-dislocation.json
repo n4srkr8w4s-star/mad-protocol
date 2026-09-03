@@ -1,0 +1,1 @@
+{"id":"MAD-V0.1-PRICE-DISLOCATION","disorderId":0,"thresholdBps":500,"scoreBands":[{"minBps":500,"score":40},{"minBps":1000,"score":65},{"minBps":1500,"score":80}],"absoluteDeviation":true}

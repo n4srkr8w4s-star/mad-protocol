@@ -1,0 +1,1 @@
+{"type":"CONTROLLED_TESTNET_DEMO","chainId":46630,"asset":"0x9B35982C720e18d84cC9D84C6c20FA9cc45b8d36","symbol":"tPONS","expectedPriceE6":1000000,"observedPriceE6":1120000,"deviationBps":1200,"disorderId":0,"note":"Synthetic test evidence; not live market data"}

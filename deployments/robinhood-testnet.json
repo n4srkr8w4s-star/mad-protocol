@@ -6,6 +6,13 @@
       "address": "0x65605F7169ec0dA7aEF8178A8b7d69159b43B222",
       "deploymentTransaction": "0xabc9ac711ff785b5df34ece144b601f6f4292b0d89ccb36f5a4eb054f4e5ee08",
       "deploymentBlock": 112284814
+    },
+    "TestPONS": {
+      "address": "0x9B35982C720e18d84cC9D84C6c20FA9cc45b8d36",
+      "deploymentTransaction": "0x1b45ce0b60239b0ab57a60a4d36ee57bee01fafcf062c223b1e4ba4be66b294a",
+      "deploymentBlock": 112556043,
+      "symbol": "tPONS",
+      "purpose": "Controlled MAD testnet integration asset; not an official PONS token"
     }
   },
   "deployer": "0xAe6EE9A04caB4A72d7723B6Fa25c0815A35e9a1f"
