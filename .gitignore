@@ -1,0 +1,25 @@
+# Environment / secrets
+.env
+.env.*
+!.env.example
+
+# Foundry
+out/
+cache/
+broadcast/
+
+# Node
+node_modules/
+npm-debug.log*
+
+# macOS
+.DS_Store
+
+# VS Code local settings
+.vscode/
+
+# Coverage
+coverage/
+lcov.info
+# Foundry dependencies
+lib/
