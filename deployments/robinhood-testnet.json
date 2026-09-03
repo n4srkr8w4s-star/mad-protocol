@@ -1,0 +1,12 @@
+{
+  "network": "Robinhood Chain Testnet",
+  "chainId": 46630,
+  "contracts": {
+    "MADStateRegistry": {
+      "address": "0x65605F7169ec0dA7aEF8178A8b7d69159b43B222",
+      "deploymentTransaction": "0xabc9ac711ff785b5df34ece144b601f6f4292b0d89ccb36f5a4eb054f4e5ee08",
+      "deploymentBlock": 112284814
+    }
+  },
+  "deployer": "0xAe6EE9A04caB4A72d7723B6Fa25c0815A35e9a1f"
+}
