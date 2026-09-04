@@ -10,12 +10,22 @@ import {
   type MADOnchainSnapshot,
 } from "../read/registryReader.js";
 
+import {
+  evaluateRobinhoodCompositeState,
+} from "../engine/evaluateRobinhoodCompositeState.js";
+
+import {
+  presentRobinhoodCompositeState,
+} from "./presenters.js";
+
 export interface MADApiDependencies {
   readSnapshot?: (config: {
     registryAddress: string;
     assetAddress: string;
     rpcUrl: string;
   }) => Promise<MADOnchainSnapshot>;
+
+  evaluateRobinhoodComposite?: typeof evaluateRobinhoodCompositeState;
 
   logger?: boolean;
 }
@@ -38,6 +48,10 @@ export function createMADApi(
   const readSnapshot =
     dependencies.readSnapshot ??
     readMADOnchainSnapshot;
+
+  const evaluateRobinhoodComposite =
+    dependencies.evaluateRobinhoodComposite ??
+    evaluateRobinhoodCompositeState;
 
   const app = Fastify({
     logger: dependencies.logger ?? true,
@@ -63,9 +77,10 @@ export function createMADApi(
   }>(
     "/api/v1/assets/:assetId/state",
     async (request, reply) => {
-      const asset = getAssetById(
-        request.params.assetId,
-      );
+      const asset =
+        getAssetById(
+          request.params.assetId,
+        );
 
       if (!asset) {
         return reply.code(404).send({
@@ -75,11 +90,42 @@ export function createMADApi(
         });
       }
 
+      if (
+        asset.type ===
+        "ROBINHOOD_STOCK_TOKEN"
+      ) {
+        if (!asset.oracleFeedAddress) {
+          return reply.code(500).send({
+            error:
+              "MAD_ASSET_CONFIGURATION_ERROR",
+            message:
+              "Robinhood Stock Token is missing oracle configuration.",
+          });
+        }
+
+        const composite =
+          await evaluateRobinhoodComposite({
+            symbol: asset.symbol,
+            feedAddress:
+              asset.oracleFeedAddress,
+            rpcUrl:
+              process.env
+                .ROBINHOOD_MAINNET_RPC ??
+              "https://rpc.mainnet.chain.robinhood.com",
+          });
+
+        return presentRobinhoodCompositeState(
+          asset,
+          composite,
+        );
+      }
+
       const snapshot =
         await readSnapshot({
           registryAddress:
             requireEnv("MAD_REGISTRY"),
-          assetAddress: asset.address,
+          assetAddress:
+            asset.address,
           rpcUrl:
             requireEnv(
               "ROBINHOOD_TESTNET_RPC",
@@ -99,8 +145,10 @@ export function createMADApi(
         },
 
         mad: snapshot.mad,
-        provenance: snapshot.provenance,
-        network: snapshot.network,
+        provenance:
+          snapshot.provenance,
+        network:
+          snapshot.network,
       };
     },
   );
