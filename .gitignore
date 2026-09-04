@@ -23,3 +23,5 @@ coverage/
 lcov.info
 # Foundry dependencies
 lib/
+# Engine build output
+engine/dist/
