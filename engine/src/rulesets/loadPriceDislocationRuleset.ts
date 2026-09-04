@@ -4,9 +4,9 @@ import { fileURLToPath } from "node:url";
 import {
   ActiveDisorderId,
   type PriceDislocationRuleset,
-} from "../domain/types";
+} from "../domain/types.js";
 
-import { keccakUtf8 } from "../crypto/keccak";
+import { keccakUtf8 } from "../crypto/keccak.js";
 
 const RULESET_URL = new URL(
   "../../../rulesets/v0.1/price-dislocation.json",

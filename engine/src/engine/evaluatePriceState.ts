@@ -2,11 +2,12 @@ import {
   ActiveDisorderId,
   type AssetContext,
   type PriceObservation,
-} from "../domain/types";
+} from "../domain/types.js";
 
-import { evaluatePriceDislocation } from "../disorders/priceDislocation";
-import { buildPriceDislocationEvidence } from "../evidence/priceDislocationEvidence";
-import { loadPriceDislocationRuleset } from "../rulesets/loadPriceDislocationRuleset";
+import { evaluatePriceDislocation } from "../disorders/priceDislocation.js";
+import { buildPriceDislocationEvidence } from "../evidence/priceDislocationEvidence.js";
+import { loadPriceDislocationRuleset } from "../rulesets/loadPriceDislocationRuleset.js";
+import type { RegistryUpdatePayload } from "../publish/types.js";
 
 export interface MADPriceState {
   asset: AssetContext;
@@ -31,13 +32,7 @@ export interface MADPriceState {
     rulesetId: string;
   };
 
-  registryUpdate: {
-    asset: string;
-    disorderScore: number;
-    disorderBitmap: bigint;
-    evidenceHash: `0x${string}`;
-    rulesetHash: `0x${string}`;
-  };
+  registryUpdate: RegistryUpdatePayload;
 
   evidence: {
     json: string;

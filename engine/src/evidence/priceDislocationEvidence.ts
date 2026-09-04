@@ -3,9 +3,9 @@ import {
   type AssetContext,
   type DisorderEvaluation,
   type PriceObservation,
-} from "../domain/types";
+} from "../domain/types.js";
 
-import { keccakUtf8 } from "../crypto/keccak";
+import { keccakUtf8 } from "../crypto/keccak.js";
 
 export interface PriceDislocationEvidence {
   type: "CONTROLLED_TESTNET_DEMO";

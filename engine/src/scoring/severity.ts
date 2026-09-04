@@ -1,4 +1,4 @@
-import { MADSeverity } from "../domain/types";
+import { MADSeverity } from "../domain/types.js";
 
 export function severityFromScore(score: number): MADSeverity {
   if (!Number.isInteger(score) || score < 0 || score > 100) {

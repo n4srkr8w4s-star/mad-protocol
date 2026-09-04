@@ -3,9 +3,9 @@ import {
   DisorderEvaluation,
   PriceDislocationRuleset,
   PriceObservation,
-} from "../domain/types";
+} from "../domain/types.js";
 
-import { severityFromScore } from "../scoring/severity";
+import { severityFromScore } from "../scoring/severity.js";
 
 export function evaluatePriceDislocation(
   observation: PriceObservation,
