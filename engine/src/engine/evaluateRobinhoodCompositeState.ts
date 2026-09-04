@@ -31,6 +31,14 @@ import {
   readRobinhoodOracle,
 } from "../adapters/robinhood/oracle.js";
 
+import type {
+  RobinhoodFeedMetadata,
+} from "../adapters/robinhood/feedDirectory.js";
+
+import {
+  fetchRobinhoodFeedMetadata,
+} from "../adapters/robinhood/feedDirectory.js";
+
 import {
   ActiveDisorderId,
 } from "../domain/types.js";
@@ -48,12 +56,24 @@ import {
 } from "../disorders/oracleDeviation.js";
 
 import {
+  evaluateUnderlyingTradingHalt,
+} from "../disorders/underlyingTradingHalt.js";
+
+import {
+  evaluateHeartbeatReferenceDataStale,
+} from "../disorders/referenceDataStale.js";
+
+import {
   aggregateDisorders,
 } from "./aggregateDisorders.js";
 
 import {
   observeSourceTiming,
 } from "./sourceTiming.js";
+
+import {
+  evaluateMarketAvailability,
+} from "./marketHours.js";
 
 type AssetLookup = (
   symbol: string,
@@ -73,11 +93,16 @@ type OracleReader = (config: {
   rpcUrl: string;
 }) => Promise<RobinhoodOracleState>;
 
+type FeedMetadataReader = (
+  proxyAddress: string,
+) => Promise<RobinhoodFeedMetadata>;
+
 export interface RobinhoodCompositeDependencies {
   getAsset?: AssetLookup;
   getPrice?: PriceLookup;
   readMultiplier?: MultiplierReader;
   readOracle?: OracleReader;
+  readFeedMetadata?: FeedMetadataReader;
 }
 
 export async function evaluateRobinhoodCompositeState(
@@ -107,9 +132,14 @@ export async function evaluateRobinhoodCompositeState(
     dependencies.readOracle ??
     readRobinhoodOracle;
 
+  const readFeedMetadata =
+    dependencies.readFeedMetadata ??
+    ((proxyAddress: string) =>
+      fetchRobinhoodFeedMetadata(proxyAddress));
+
   /*
-   * One observation cycle:
-   * fetch each external source once.
+   * One observation cycle.
+   * Each external source is fetched once.
    */
   const [
     rawAsset,
@@ -131,6 +161,10 @@ export async function evaluateRobinhoodCompositeState(
   const underlying =
     normaliseRobinhoodPrice(rawPrice);
 
+  /*
+   * Verify that /assets and /prices refer to
+   * the same canonical Robinhood Chain deployment.
+   */
   const priceDeployment =
     rawPrice.deployments.find(
       (deployment) =>
@@ -153,9 +187,13 @@ export async function evaluateRobinhoodCompositeState(
     );
   }
 
+  /*
+   * Fetch independent onchain/reference sources once.
+   */
   const [
     onchainMultiplier,
     oracle,
+    feedMetadata,
   ] = await Promise.all([
     readMultiplier({
       contractAddress:
@@ -167,8 +205,55 @@ export async function evaluateRobinhoodCompositeState(
       feedAddress: input.feedAddress,
       rpcUrl: input.rpcUrl,
     }),
+
+    readFeedMetadata(
+      input.feedAddress,
+    ),
   ]);
 
+  /*
+   * Source-identity sanity checks.
+   */
+  if (
+    feedMetadata.proxyAddress.toLowerCase() !==
+    oracle.feedAddress.toLowerCase()
+  ) {
+    throw new Error(
+      `${stockToken.asset.symbol} oracle feed does not match feed-directory proxy`,
+    );
+  }
+
+  if (
+    feedMetadata.decimals !==
+    oracle.decimals
+  ) {
+    throw new Error(
+      `${stockToken.asset.symbol} oracle decimals do not match feed-directory metadata`,
+    );
+  }
+
+  if (
+    feedMetadata.baseAsset !== null &&
+    feedMetadata.baseAsset.toUpperCase() !==
+      stockToken.asset.symbol.toUpperCase()
+  ) {
+    throw new Error(
+      `${stockToken.asset.symbol} feed-directory base asset mismatch`,
+    );
+  }
+
+  /*
+   * AD-002
+   */
+  const tradingHaltEvaluation =
+    evaluateUnderlyingTradingHalt({
+      isTradingHalt:
+        underlying.isTradingHalt,
+    });
+
+  /*
+   * AD-004
+   */
   const multiplierEvaluation =
     evaluateMultiplierTransition({
       expectedCurrentE18:
@@ -187,6 +272,9 @@ export async function evaluateRobinhoodCompositeState(
             ),
     });
 
+  /*
+   * AD-007
+   */
   const oracleEvaluation =
     evaluateOracleDeviation({
       underlyingMidpointE6:
@@ -204,18 +292,61 @@ export async function evaluateRobinhoodCompositeState(
         oracle.decimals,
     });
 
-  const composite =
-    aggregateDisorders([
-      multiplierEvaluation,
-      oracleEvaluation,
-    ]);
-
   const evaluationTimeUnix =
     input.evaluationTimeUnix ??
     BigInt(
       Math.floor(Date.now() / 1000),
     );
 
+  /*
+   * Feed-specific market semantics come from
+   * the reference-data directory.
+   */
+  const marketAvailability =
+    evaluateMarketAvailability(
+      feedMetadata.marketHours,
+      evaluationTimeUnix,
+    );
+
+  /*
+   * AD-005
+   *
+   * Freshness is evaluated using the published
+   * heartbeat rather than an invented MAD timeout.
+   */
+  const freshnessEvaluation =
+    evaluateHeartbeatReferenceDataStale({
+      evaluationTimeUnix,
+
+      sourceUpdatedAtUnix:
+        BigInt(
+          oracle.updatedAtUnix,
+        ),
+
+      heartbeatSeconds:
+        feedMetadata.heartbeatSeconds,
+
+      marketAvailability,
+    });
+
+  /*
+   * Composite MAD state.
+   *
+   * Maximum active disorder score wins.
+   * Bitmap preserves every active disorder.
+   */
+  const composite =
+    aggregateDisorders([
+      tradingHaltEvaluation,
+      multiplierEvaluation,
+      freshnessEvaluation,
+      oracleEvaluation,
+    ]);
+
+  /*
+   * Timing remains observable independently
+   * from the AD-005 judgement.
+   */
   const timing =
     observeSourceTiming({
       evaluationTimeUnix,
@@ -306,6 +437,17 @@ export async function evaluateRobinhoodCompositeState(
 
         updatedAt:
           oracle.updatedAtIso,
+
+        heartbeatSeconds:
+          feedMetadata.heartbeatSeconds,
+
+        marketHours:
+          feedMetadata.marketHours,
+
+        marketAvailability,
+
+        threshold:
+          feedMetadata.threshold,
       },
 
       timing,
@@ -315,6 +457,17 @@ export async function evaluateRobinhoodCompositeState(
       assessed: [
         {
           id:
+            ActiveDisorderId.UNDERLYING_TRADING_HALT,
+
+          code:
+            "UNDERLYING_TRADING_HALT",
+
+          evaluation:
+            tradingHaltEvaluation,
+        },
+
+        {
+          id:
             ActiveDisorderId.MULTIPLIER_TRANSITION,
 
           code:
@@ -322,6 +475,17 @@ export async function evaluateRobinhoodCompositeState(
 
           evaluation:
             multiplierEvaluation,
+        },
+
+        {
+          id:
+            ActiveDisorderId.REFERENCE_DATA_STALE,
+
+          code:
+            "REFERENCE_DATA_STALE",
+
+          evaluation:
+            freshnessEvaluation,
         },
 
         {
@@ -336,29 +500,11 @@ export async function evaluateRobinhoodCompositeState(
         },
       ],
 
-      unassessed: [
-        {
-          id:
-            ActiveDisorderId.UNDERLYING_TRADING_HALT,
-
-          code:
-            "UNDERLYING_TRADING_HALT",
-
-          reason:
-            "Source observation is available, but the MAD evaluator has not yet been applied.",
-        },
-
-        {
-          id:
-            ActiveDisorderId.REFERENCE_DATA_STALE,
-
-          code:
-            "REFERENCE_DATA_STALE",
-
-          reason:
-            "Source timing is measured, but no production freshness policy is configured yet.",
-        },
-      ],
+      unassessed: [] as Array<{
+        id: ActiveDisorderId;
+        code: string;
+        reason: string;
+      }>,
     },
 
     mad: {
@@ -377,7 +523,7 @@ export async function evaluateRobinhoodCompositeState(
       assessedDisorders:
         composite.assessedDisorders,
 
-      unassessedDisorders: 2,
+      unassessedDisorders: 0,
     },
   };
 }

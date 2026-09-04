@@ -42,12 +42,10 @@ const AAPL = {
       whole: "TRADING_STATUS_TRADABLE",
       fractional: "TRADING_STATUS_TRADABLE",
     },
-
     extended: {
       whole: "TRADING_STATUS_TRADABLE",
       fractional: "TRADING_STATUS_TRADABLE",
     },
-
     overnight: {
       whole: "TRADING_STATUS_TRADABLE",
       fractional: "TRADING_STATUS_TRADABLE",
@@ -74,8 +72,7 @@ const AAPL_PRICE = {
   ask: "327.45",
   currency: "USD",
 
-  dailyTradingVolume:
-    "37225806",
+  dailyTradingVolume: "37225806",
 
   isTradingHalt: false,
 
@@ -140,10 +137,56 @@ const AAPL_ORACLE = {
     "18446744073709552171",
 };
 
+const AAPL_FEED_METADATA = {
+  name:
+    "Robinhood AAPL / USD",
+
+  proxyAddress:
+    "0x6B22A786bAa607d76728168703a39Ea9C99f2cD0",
+
+  contractAddress:
+    "0xBb11A21267cFDb63d4935d99a499133DD1744ACb",
+
+  secondaryProxyAddress:
+    "0x4bDbb3150014c6Ab2C6D9347B0779c49015a2f3f",
+
+  heartbeatSeconds: 86400,
+  threshold: 0.5,
+  decimals: 8,
+
+  assetClass: "Equity",
+  assetSubClass: "US",
+  baseAsset: "AAPL",
+  quoteAsset: "USD",
+  marketHours: "us_equities_24/5",
+  productType: "Price",
+  productTypeCode:
+    "primaryTokenizedPrice",
+};
+
+function baseDependencies() {
+  return {
+    getAsset:
+      async () => AAPL,
+
+    getPrice:
+      async () => AAPL_PRICE,
+
+    readMultiplier:
+      async () => AAPL_MULTIPLIER,
+
+    readOracle:
+      async () => AAPL_ORACLE,
+
+    readFeedMetadata:
+      async () => AAPL_FEED_METADATA,
+  };
+}
+
 describe(
   "Robinhood composite MAD state",
   () => {
-    it("produces a coherent composite AAPL assessment", async () => {
+    it("produces a fully assessed coherent AAPL state", async () => {
       const result =
         await evaluateRobinhoodCompositeState(
           {
@@ -159,21 +202,7 @@ describe(
               1788509000n,
           },
 
-          {
-            getAsset:
-              async () => AAPL,
-
-            getPrice:
-              async () => AAPL_PRICE,
-
-            readMultiplier:
-              async () =>
-                AAPL_MULTIPLIER,
-
-            readOracle:
-              async () =>
-                AAPL_ORACLE,
-          },
+          baseDependencies(),
         );
 
       expect(
@@ -200,14 +229,18 @@ describe(
 
       expect(
         result.mad.assessedDisorders,
-      ).toBe(2);
+      ).toBe(4);
 
       expect(
         result.mad.unassessedDisorders,
-      ).toBe(2);
+      ).toBe(0);
+
+      expect(
+        result.disorders.unassessed,
+      ).toEqual([]);
     });
 
-    it("keeps unassessed disorders explicitly separate from NORMAL assessments", async () => {
+    it("assesses all four Robinhood disorders explicitly", async () => {
       const result =
         await evaluateRobinhoodCompositeState(
           {
@@ -223,21 +256,7 @@ describe(
               1788509000n,
           },
 
-          {
-            getAsset:
-              async () => AAPL,
-
-            getPrice:
-              async () => AAPL_PRICE,
-
-            readMultiplier:
-              async () =>
-                AAPL_MULTIPLIER,
-
-            readOracle:
-              async () =>
-                AAPL_ORACLE,
-          },
+          baseDependencies(),
         );
 
       expect(
@@ -245,40 +264,51 @@ describe(
           (item) => item.id,
         ),
       ).toEqual([
+        ActiveDisorderId.UNDERLYING_TRADING_HALT,
         ActiveDisorderId.MULTIPLIER_TRANSITION,
+        ActiveDisorderId.REFERENCE_DATA_STALE,
         ActiveDisorderId.ORACLE_DEVIATION,
       ]);
 
-      expect(
-        result.disorders.unassessed.map(
-          (item) => item.id,
-        ),
-      ).toEqual([
-        ActiveDisorderId.UNDERLYING_TRADING_HALT,
-        ActiveDisorderId.REFERENCE_DATA_STALE,
-      ]);
+      const freshness =
+        result.disorders.assessed.find(
+          (item) =>
+            item.id ===
+            ActiveDisorderId.REFERENCE_DATA_STALE,
+        );
 
       expect(
-        result.observations.timing
-          .robinhoodPriceAgeSeconds,
-      ).toBe(30);
+        freshness?.evaluation.active,
+      ).toBe(false);
 
       expect(
-        result.observations.timing
-          .oracleAgeSeconds,
-      ).toBe(4705);
+        freshness?.evaluation.score,
+      ).toBe(0);
 
       expect(
-        result.observations.timing
-          .sourceSkewSeconds,
-      ).toBe(4675);
+        result.observations.oracle
+          .heartbeatSeconds,
+      ).toBe(86400);
+
+      expect(
+        result.observations.oracle
+          .marketHours,
+      ).toBe(
+        "us_equities_24/5",
+      );
+
+      expect(
+        result.observations.oracle
+          .marketAvailability,
+      ).toBe("OPEN");
     });
 
-    it("fetches each external source exactly once per evaluation cycle", async () => {
+    it("fetches every external source exactly once per cycle", async () => {
       let assetCalls = 0;
       let priceCalls = 0;
       let multiplierCalls = 0;
       let oracleCalls = 0;
+      let feedMetadataCalls = 0;
 
       await evaluateRobinhoodCompositeState(
         {
@@ -314,6 +344,11 @@ describe(
             oracleCalls += 1;
             return AAPL_ORACLE;
           },
+
+          readFeedMetadata: async () => {
+            feedMetadataCalls += 1;
+            return AAPL_FEED_METADATA;
+          },
         },
       );
 
@@ -321,9 +356,10 @@ describe(
       expect(priceCalls).toBe(1);
       expect(multiplierCalls).toBe(1);
       expect(oracleCalls).toBe(1);
+      expect(feedMetadataCalls).toBe(1);
     });
 
-    it("aggregates simultaneous Robinhood disorders deterministically", async () => {
+    it("aggregates simultaneous disorders deterministically", async () => {
       const result =
         await evaluateRobinhoodCompositeState(
           {
@@ -340,6 +376,8 @@ describe(
           },
 
           {
+            ...baseDependencies(),
+
             getAsset:
               async () => ({
                 ...AAPL,
@@ -347,13 +385,6 @@ describe(
                 pendingMultiplier:
                   "0.500000000000000000",
               }),
-
-            getPrice:
-              async () => AAPL_PRICE,
-
-            readMultiplier:
-              async () =>
-                AAPL_MULTIPLIER,
 
             readOracle:
               async () => ({
