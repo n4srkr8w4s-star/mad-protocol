@@ -1,9 +1,12 @@
 import { useEffect, useState } from "react";
-import { AssetSearch } from "./components/AssetSearch.js";
+import {
+  AssetSearch,
+  type SearchResult,
+} from "./components/AssetSearch.js";
 import "./App.css";
 
-const API_URL =
-  "http://127.0.0.1:3000/api/v1/assets/aapl/state";
+const API_BASE_URL =
+  "http://127.0.0.1:3000/api/v1/assets";
 
 interface Disorder {
   id: number;
@@ -27,6 +30,16 @@ interface MADState {
     robinhoodAssetId: string;
     isin: string;
     status: string;
+  };
+
+  capability: {
+    level:
+      | "FULL"
+      | "PARTIAL"
+      | "DISCOVERABLE";
+
+    supportedDisorders: number;
+    totalDisorders: number;
   };
 
   observations: {
@@ -117,14 +130,55 @@ function App() {
   const [state, setState] = useState<MADState | null>(null);
   const [error, setError] = useState<string | null>(null);
 
+  const [
+    selectedAsset,
+    setSelectedAsset,
+  ] = useState<SearchResult | null>(
+    null,
+  );
+
+  function handleSelectAsset(
+    result: SearchResult,
+  ) {
+    setSelectedAsset(result);
+    setState(null);
+    setError(null);
+  }
+
   useEffect(() => {
     let active = true;
 
+    /*
+     * Capability and current state are different.
+     * PARTIAL/DISCOVERABLE assets remain selectable,
+     * but the FULL composite evaluator is not called.
+     */
+    if (
+      selectedAsset &&
+      selectedAsset.monitoring !== "FULL"
+    ) {
+      setState(null);
+      setError(null);
+
+      return () => {
+        active = false;
+      };
+    }
+
+    const symbol =
+      selectedAsset?.symbol ??
+      "AAPL";
+
     async function loadState() {
       try {
-        const response = await fetch(API_URL, {
-          cache: "no-store",
-        });
+        const response = await fetch(
+          `${API_BASE_URL}/${encodeURIComponent(
+            symbol,
+          )}/state`,
+          {
+            cache: "no-store",
+          },
+        );
 
         if (!response.ok) {
           throw new Error(
@@ -161,7 +215,140 @@ function App() {
       active = false;
       window.clearInterval(refreshTimer);
     };
-  }, []);
+  }, [selectedAsset]);
+
+  /*
+   * A PARTIAL asset is a valid Robinhood asset.
+   * It is not an error and it is not FULL MAD state.
+   */
+  if (
+    selectedAsset &&
+    selectedAsset.monitoring !== "FULL"
+  ) {
+    const limitation =
+      selectedAsset.feedResolution ===
+      "MISSING"
+        ? "Canonical primary tokenized-price feed metadata is not currently available for this asset."
+        : selectedAsset.feedResolution ===
+            "AMBIGUOUS"
+          ? "More than one canonical feed candidate was found, so MAD will not choose one implicitly."
+          : "The asset does not currently satisfy all MAD state capability requirements.";
+
+    return (
+      <main className="observatory">
+        <header className="topbar">
+          <div className="brand">
+            <img
+              className="brand-logo"
+              src="/mad-logo.png"
+              alt="MAD — Ministry of Active Disorder"
+            />
+            <div>
+              <div className="brand-title">
+                MINISTRY OF ACTIVE DISORDER
+              </div>
+              <div className="brand-subtitle">
+                MAD OBSERVATORY
+              </div>
+            </div>
+          </div>
+
+          <AssetSearch
+            onSelectAsset={
+              handleSelectAsset
+            }
+          />
+
+          <div className="network">
+            <span className="network-dot" />
+            ROBINHOOD CHAIN · LIVE
+          </div>
+        </header>
+
+        <section className="hero">
+          <div>
+            <div className="eyebrow">
+              ASSET CAPABILITY
+            </div>
+
+            <div className="asset-heading">
+              <h1>
+                {selectedAsset.symbol}
+              </h1>
+
+              <div className="asset-meta">
+                <span>
+                  {selectedAsset.name}
+                </span>
+                <span>
+                  {selectedAsset.isin}
+                </span>
+              </div>
+            </div>
+          </div>
+
+          <div className="state-panel">
+            <div>
+              <div className="state-label">
+                MAD CAPABILITY
+              </div>
+
+              <div className="state-value">
+                {
+                  selectedAsset.monitoring
+                }
+              </div>
+
+              <div className="coverage">
+                {
+                  selectedAsset.supportedDisorders
+                }{" "}
+                /{" "}
+                {
+                  selectedAsset.totalDisorders
+                }{" "}
+                disorder classes supported
+              </div>
+            </div>
+          </div>
+        </section>
+
+        <section className="content-grid">
+          <article className="panel">
+            <div className="panel-header">
+              <div>
+                <span className="eyebrow">
+                  CAPABILITY COVERAGE
+                </span>
+                <h2>
+                  Full MAD state unavailable
+                </h2>
+              </div>
+            </div>
+
+            <p>
+              {limitation}
+            </p>
+
+            <p>
+              This does not indicate disorder.
+              It describes MAD's current evidence
+              capability for this asset.
+            </p>
+          </article>
+        </section>
+
+        <footer>
+          <span>
+            EXPECTED STATE − OBSERVED STATE = DISORDER
+          </span>
+          <span>
+            MAD / ROBINHOOD CHAIN
+          </span>
+        </footer>
+      </main>
+    );
+  }
 
   if (!state) {
     return (
@@ -180,7 +367,11 @@ function App() {
             </div>
           </div>
 
-          <AssetSearch />
+          <AssetSearch
+              onSelectAsset={
+                handleSelectAsset
+              }
+            />
 
         <div className="network">
             <span className="network-dot" />
@@ -232,7 +423,11 @@ function App() {
           </div>
         </div>
 
-        <AssetSearch />
+        <AssetSearch
+              onSelectAsset={
+                handleSelectAsset
+              }
+            />
 
         <div className="network">
           <span className="network-dot" />
@@ -271,10 +466,29 @@ function App() {
             </div>
 
             <div className="coverage">
-              {state.mad.assessedDisorders} /{" "}
-              {state.mad.assessedDisorders +
-                state.mad.unassessedDisorders}{" "}
-              disorders assessed
+              CAPABILITY{" "}
+              {state.capability.level}
+              {" · "}
+              {
+                state.capability.supportedDisorders
+              }
+              /
+              {
+                state.capability.totalDisorders
+              }
+            </div>
+
+            <div className="coverage">
+              CURRENT COVERAGE{" "}
+              {
+                state.mad.assessedDisorders
+              }
+              {" / "}
+              {
+                state.mad.assessedDisorders +
+                state.mad.unassessedDisorders
+              }
+              {" ASSESSED"}
             </div>
           </div>
         </div>

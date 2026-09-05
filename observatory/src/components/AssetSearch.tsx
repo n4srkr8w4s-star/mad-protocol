@@ -3,7 +3,7 @@ import {
   useState,
 } from "react";
 
-interface SearchResult {
+export interface SearchResult {
   symbol: string;
   name: string;
   isin: string;
@@ -13,7 +13,16 @@ interface SearchResult {
   logoUrl: string;
   monitoring:
     | "FULL"
+    | "PARTIAL"
     | "DISCOVERABLE";
+
+  supportedDisorders: number;
+  totalDisorders: number;
+
+  feedResolution:
+    | "RESOLVED"
+    | "MISSING"
+    | "AMBIGUOUS";
 }
 
 interface SearchResponse {
@@ -23,7 +32,7 @@ interface SearchResponse {
 }
 
 interface AssetSearchProps {
-  onSelectFullAsset?: (
+  onSelectAsset?: (
     result: SearchResult,
   ) => void;
 }
@@ -32,7 +41,7 @@ const SEARCH_URL =
   "http://127.0.0.1:3000/api/v1/assets/search";
 
 export function AssetSearch({
-  onSelectFullAsset,
+  onSelectAsset,
 }: AssetSearchProps) {
   const [query, setQuery] =
     useState("");
@@ -118,16 +127,12 @@ export function AssetSearch({
   function selectResult(
     result: SearchResult,
   ) {
-    if (
-      result.monitoring === "FULL"
-    ) {
-      onSelectFullAsset?.(
-        result,
-      );
+    onSelectAsset?.(
+      result,
+    );
 
-      setQuery("");
-      setResults([]);
-    }
+    setQuery("");
+    setResults([]);
   }
 
   return (
@@ -233,13 +238,14 @@ export function AssetSearch({
 
           {results.some(
             (result) =>
-              result.monitoring ===
-              "DISCOVERABLE",
+              result.monitoring !==
+              "FULL",
           ) && (
             <div className="search-footnote">
-              DISCOVERABLE = available on
-              Robinhood Chain, but not yet
-              fully assessed by MAD.
+              FULL = all current MAD disorder
+              classes structurally supported.
+              PARTIAL = some MAD assessments
+              are available.
             </div>
           )}
         </div>
