@@ -31,18 +31,7 @@ export const MAD_ASSETS: MADAssetDefinition[] = [
       "Controlled testnet-only asset used for MAD integration testing. Not an official PONS token.",
   },
 
-  {
-    id: "aapl",
-    symbol: "AAPL",
-    name: "Apple • Robinhood Token",
-    type: "ROBINHOOD_STOCK_TOKEN",
-    chainId: 4663,
-    address:
-      "0xaF3D76f1834A1d425780943C99Ea8A608f8a93f9",
-    underlyingSymbol: "AAPL",
-    description:
-      "Apple Stock Token on Robinhood Chain monitored by MAD.",
-  },
+
 ];
 
 export function getAssetById(

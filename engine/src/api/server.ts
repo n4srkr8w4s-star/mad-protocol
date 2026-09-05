@@ -25,6 +25,10 @@ import {
 } from "../engine/resolveRobinhoodCapability.js";
 
 import {
+  scanRobinhoodUniverse,
+} from "../engine/scanRobinhoodUniverse.js";
+
+import {
   presentRobinhoodCompositeState,
 } from "./presenters.js";
 
@@ -51,6 +55,7 @@ export interface MADApiDependencies {
     symbol: string,
   ) => Promise<ApiAssetCapability | undefined>;
   searchRobinhoodAssets?: typeof searchRobinhoodAssets;
+  scanRobinhoodUniverse?: typeof scanRobinhoodUniverse;
 
   logger?: boolean;
 }
@@ -86,6 +91,10 @@ export function createMADApi(
     dependencies.searchRobinhoodAssets ??
     searchRobinhoodAssets;
 
+  const scanUniverse =
+    dependencies.scanRobinhoodUniverse ??
+    scanRobinhoodUniverse;
+
   const app = Fastify({
     logger: dependencies.logger ?? true,
   });
@@ -106,8 +115,83 @@ export function createMADApi(
   });
 
   app.get("/api/v1/assets", async () => {
+    const universe =
+      await scanUniverse();
+
+    const robinhoodAssets =
+      universe.assets.map(
+        ({
+          capability,
+          feedResolution,
+        }) => ({
+          id:
+            capability.symbol.toLowerCase(),
+
+          symbol:
+            capability.symbol,
+
+          name:
+            capability.name,
+
+          type:
+            "ROBINHOOD_STOCK_TOKEN",
+
+          address:
+            capability.deployment?.address ??
+            null,
+
+          chainId:
+            capability.deployment?.chainId ??
+            null,
+
+          underlyingSymbol:
+            capability.symbol,
+
+          robinhoodAssetId:
+            capability.assetId,
+
+          isin:
+            capability.isin,
+
+          status:
+            capability.status.replace(
+              "ASSET_STATUS_",
+              "",
+            ),
+
+          monitoring:
+            capability.capability,
+
+          supportedDisorders:
+            capability.supportedDisorders,
+
+          totalDisorders:
+            capability.totalDisorders,
+
+          feedResolution,
+        }),
+      );
+
     return {
-      assets: MAD_ASSETS,
+      generatedAt:
+        universe.generatedAt,
+
+      counts: {
+        total:
+          MAD_ASSETS.length +
+          robinhoodAssets.length,
+
+        madSpecific:
+          MAD_ASSETS.length,
+
+        robinhood:
+          universe.counts,
+      },
+
+      assets: [
+        ...MAD_ASSETS,
+        ...robinhoodAssets,
+      ],
     };
   });
 
