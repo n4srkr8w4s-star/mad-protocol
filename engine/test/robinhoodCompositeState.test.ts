@@ -422,5 +422,55 @@ describe(
         ActiveDisorderId.ORACLE_DEVIATION,
       ]);
     });
+
+    it("does not assess oracle deviation when the reference market is closed", async () => {
+      const result =
+        await evaluateRobinhoodCompositeState(
+          {
+            symbol: "AAPL",
+            rpcUrl:
+              "https://example.invalid",
+            evaluationTimeUnix:
+              1788609600n,
+          },
+          baseDependencies(),
+        );
+
+      expect(
+        result.mad.disorderScore,
+      ).toBe(0);
+
+      expect(
+        result.mad.disorderBitmap,
+      ).toBe(0n);
+
+      expect(
+        result.mad.assessedDisorders,
+      ).toBe(3);
+
+      expect(
+        result.mad.unassessedDisorders,
+      ).toBe(1);
+
+      expect(
+        result.disorders.unassessed,
+      ).toEqual([
+        expect.objectContaining({
+          id:
+            ActiveDisorderId.ORACLE_DEVIATION,
+          code:
+            "ORACLE_DEVIATION",
+        }),
+      ]);
+
+      expect(
+        result.disorders.assessed.some(
+          (item) =>
+            item.id ===
+            ActiveDisorderId.ORACLE_DEVIATION,
+        ),
+      ).toBe(false);
+    });
+
   },
 );

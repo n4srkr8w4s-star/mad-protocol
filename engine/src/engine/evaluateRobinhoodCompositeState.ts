@@ -277,26 +277,6 @@ export async function evaluateRobinhoodCompositeState(
             ),
     });
 
-  /*
-   * AD-007
-   */
-  const oracleEvaluation =
-    evaluateOracleDeviation({
-      underlyingMidpointE6:
-        underlying.midpointE6,
-
-      multiplierE18:
-        BigInt(
-          stockToken.multiplier.currentE18,
-        ),
-
-      oracleAnswer:
-        oracle.answer,
-
-      oracleDecimals:
-        oracle.decimals,
-    });
-
   const evaluationTimeUnix =
     input.evaluationTimeUnix ??
     BigInt(
@@ -307,11 +287,36 @@ export async function evaluateRobinhoodCompositeState(
    * Feed-specific market semantics come from
    * the reference-data directory.
    */
+
   const marketAvailability =
     evaluateMarketAvailability(
       feedMetadata.marketHours,
       evaluationTimeUnix,
     );
+
+  /*
+   * AD-008 ORACLE_DEVIATION
+   *
+   * Oracle deviation is assessed only when the
+   * reference market is available. Closed or unknown
+   * market state produces an explicit unassessed result.
+   */
+
+  const oracleEvaluation =
+    marketAvailability === "OPEN"
+      ? evaluateOracleDeviation({
+          underlyingMidpointE6:
+            underlying.midpointE6,
+          multiplierE18:
+            BigInt(
+              stockToken.multiplier.currentE18,
+            ),
+          oracleAnswer:
+            oracle.answer,
+          oracleDecimals:
+            oracle.decimals,
+        })
+      : null;
 
   /*
    * AD-005
@@ -345,7 +350,9 @@ export async function evaluateRobinhoodCompositeState(
       tradingHaltEvaluation,
       multiplierEvaluation,
       freshnessEvaluation,
-      oracleEvaluation,
+      ...(oracleEvaluation === null
+        ? []
+        : [oracleEvaluation]),
     ]);
 
   /*
@@ -493,19 +500,36 @@ export async function evaluateRobinhoodCompositeState(
             freshnessEvaluation,
         },
 
-        {
-          id:
-            ActiveDisorderId.ORACLE_DEVIATION,
-
-          code:
-            "ORACLE_DEVIATION",
-
-          evaluation:
-            oracleEvaluation,
-        },
+        ...(oracleEvaluation === null
+          ? []
+          : [
+              {
+                id:
+                  ActiveDisorderId.ORACLE_DEVIATION,
+                code:
+                  "ORACLE_DEVIATION",
+                evaluation:
+                  oracleEvaluation,
+              },
+            ]),
       ],
 
-      unassessed: [] as Array<{
+      unassessed: (
+        oracleEvaluation === null
+          ? [
+              {
+                id:
+                  ActiveDisorderId.ORACLE_DEVIATION,
+                code:
+                  "ORACLE_DEVIATION",
+                reason:
+                  marketAvailability === "CLOSED"
+                    ? "Reference market is closed; oracle deviation is not assessed."
+                    : "Reference market availability is unknown; oracle deviation is not assessed.",
+              },
+            ]
+          : []
+      ) as Array<{
         id: ActiveDisorderId;
         code: string;
         reason: string;
@@ -528,7 +552,8 @@ export async function evaluateRobinhoodCompositeState(
       assessedDisorders:
         composite.assessedDisorders,
 
-      unassessedDisorders: 0,
+      unassessedDisorders:
+        oracleEvaluation === null ? 1 : 0,
     },
   };
 }
