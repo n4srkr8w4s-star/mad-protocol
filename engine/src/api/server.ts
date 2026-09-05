@@ -7,6 +7,10 @@ import {
 } from "../assets/catalog.js";
 
 import {
+  searchRobinhoodAssets,
+} from "../assets/discovery.js";
+
+import {
   readMADOnchainSnapshot,
   type MADOnchainSnapshot,
 } from "../read/registryReader.js";
@@ -27,6 +31,7 @@ export interface MADApiDependencies {
   }) => Promise<MADOnchainSnapshot>;
 
   evaluateRobinhoodComposite?: typeof evaluateRobinhoodCompositeState;
+  searchRobinhoodAssets?: typeof searchRobinhoodAssets;
 
   logger?: boolean;
 }
@@ -54,6 +59,10 @@ export function createMADApi(
     dependencies.evaluateRobinhoodComposite ??
     evaluateRobinhoodCompositeState;
 
+  const searchAssets =
+    dependencies.searchRobinhoodAssets ??
+    searchRobinhoodAssets;
+
   const app = Fastify({
     logger: dependencies.logger ?? true,
   });
@@ -78,6 +87,35 @@ export function createMADApi(
       assets: MAD_ASSETS,
     };
   });
+
+  app.get<{
+    Querystring: {
+      q?: string;
+    };
+  }>(
+    "/api/v1/assets/search",
+    async (request, reply) => {
+      const query =
+        request.query.q?.trim();
+
+      if (!query) {
+        return reply.code(400).send({
+          error: "MAD_SEARCH_QUERY_REQUIRED",
+          message:
+            "A non-empty search query is required.",
+        });
+      }
+
+      const results =
+        await searchAssets(query);
+
+      return {
+        query,
+        count: results.length,
+        results,
+      };
+    },
+  );
 
   app.get<{
     Params: {

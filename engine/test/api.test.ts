@@ -424,4 +424,109 @@ describe("MAD API", () => {
 
     await app.close();
   });
+
+  it("searches the Robinhood asset directory", async () => {
+    const queries: string[] = [];
+
+    const app = createMADApi({
+      logger: false,
+
+      searchRobinhoodAssets:
+        async (query) => {
+          queries.push(query);
+
+          return [
+            {
+              symbol: "TSLA",
+              name:
+                "Tesla • Robinhood Token",
+              isin: "US88160R1014",
+              address:
+                "0x1111111111111111111111111111111111111111",
+              chainId: 4663,
+              status: "ACTIVE",
+              logoUrl:
+                "https://example.com/tsla.png",
+              monitoring:
+                "DISCOVERABLE",
+            },
+          ];
+        },
+    });
+
+    const response =
+      await app.inject({
+        method: "GET",
+        url:
+          "/api/v1/assets/search?q=tesla",
+      });
+
+    expect(response.statusCode).toBe(200);
+
+    expect(queries).toEqual([
+      "tesla",
+    ]);
+
+    expect(
+      response.json(),
+    ).toEqual({
+      query: "tesla",
+      count: 1,
+      results: [
+        {
+          symbol: "TSLA",
+          name:
+            "Tesla • Robinhood Token",
+          isin: "US88160R1014",
+          address:
+            "0x1111111111111111111111111111111111111111",
+          chainId: 4663,
+          status: "ACTIVE",
+          logoUrl:
+            "https://example.com/tsla.png",
+          monitoring:
+            "DISCOVERABLE",
+        },
+      ],
+    });
+
+    await app.close();
+  });
+
+  it("rejects an empty asset search query", async () => {
+    let searchCalls = 0;
+
+    const app = createMADApi({
+      logger: false,
+
+      searchRobinhoodAssets:
+        async () => {
+          searchCalls += 1;
+          return [];
+        },
+    });
+
+    const response =
+      await app.inject({
+        method: "GET",
+        url:
+          "/api/v1/assets/search?q=",
+      });
+
+    expect(response.statusCode).toBe(400);
+
+    expect(searchCalls).toBe(0);
+
+    expect(
+      response.json(),
+    ).toEqual({
+      error:
+        "MAD_SEARCH_QUERY_REQUIRED",
+      message:
+        "A non-empty search query is required.",
+    });
+
+    await app.close();
+  });
+
 });

@@ -1,4 +1,5 @@
 import { useEffect, useState } from "react";
+import { AssetSearch } from "./components/AssetSearch.js";
 import "./App.css";
 
 const API_URL =
@@ -179,7 +180,9 @@ function App() {
             </div>
           </div>
 
-          <div className="network">
+          <AssetSearch />
+
+        <div className="network">
             <span className="network-dot" />
             ROBINHOOD CHAIN
           </div>
@@ -228,6 +231,8 @@ function App() {
             </div>
           </div>
         </div>
+
+        <AssetSearch />
 
         <div className="network">
           <span className="network-dot" />
