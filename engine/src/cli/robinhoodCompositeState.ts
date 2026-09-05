@@ -11,11 +11,10 @@ const DEFAULT_ROBINHOOD_MAINNET_RPC =
 
 async function main(): Promise<void> {
   const symbol = process.argv[2];
-  const feedAddress = process.argv[3];
 
-  if (!symbol || !feedAddress) {
+  if (!symbol) {
     throw new Error(
-      "Usage: node dist/cli/robinhoodCompositeState.js <symbol> <feedAddress>",
+      "Usage: node dist/cli/robinhoodCompositeState.js <symbol>",
     );
   }
 
@@ -29,9 +28,7 @@ async function main(): Promise<void> {
 
   const result =
     await evaluateRobinhoodCompositeState({
-      symbol,
-      feedAddress,
-      rpcUrl,
+      symbol,      rpcUrl,
     });
 
   console.log("");

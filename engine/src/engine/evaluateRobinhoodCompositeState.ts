@@ -36,7 +36,7 @@ import type {
 } from "../adapters/robinhood/feedDirectory.js";
 
 import {
-  fetchRobinhoodFeedMetadata,
+  fetchRobinhoodFeedMetadataBySymbol,
 } from "../adapters/robinhood/feedDirectory.js";
 
 import {
@@ -93,8 +93,8 @@ type OracleReader = (config: {
   rpcUrl: string;
 }) => Promise<RobinhoodOracleState>;
 
-type FeedMetadataReader = (
-  proxyAddress: string,
+type FeedMetadataResolver = (
+  symbol: string,
 ) => Promise<RobinhoodFeedMetadata>;
 
 export interface RobinhoodCompositeDependencies {
@@ -102,13 +102,12 @@ export interface RobinhoodCompositeDependencies {
   getPrice?: PriceLookup;
   readMultiplier?: MultiplierReader;
   readOracle?: OracleReader;
-  readFeedMetadata?: FeedMetadataReader;
+  resolveFeedMetadata?: FeedMetadataResolver;
 }
 
 export async function evaluateRobinhoodCompositeState(
   input: {
     symbol: string;
-    feedAddress: string;
     rpcUrl: string;
     evaluationTimeUnix?: bigint;
   },
@@ -132,10 +131,10 @@ export async function evaluateRobinhoodCompositeState(
     dependencies.readOracle ??
     readRobinhoodOracle;
 
-  const readFeedMetadata =
-    dependencies.readFeedMetadata ??
-    ((proxyAddress: string) =>
-      fetchRobinhoodFeedMetadata(proxyAddress));
+  const resolveFeedMetadata =
+    dependencies.resolveFeedMetadata ??
+    ((symbol: string) =>
+      fetchRobinhoodFeedMetadataBySymbol(symbol));
 
   /*
    * One observation cycle.
@@ -188,27 +187,33 @@ export async function evaluateRobinhoodCompositeState(
   }
 
   /*
+   * Resolve canonical feed metadata from the
+   * Robinhood Stock Token symbol.
+   */
+
+  const feedMetadata =
+    await resolveFeedMetadata(
+      stockToken.asset.symbol,
+    );
+
+  /*
    * Fetch independent onchain/reference sources once.
    */
+
   const [
     onchainMultiplier,
     oracle,
-    feedMetadata,
   ] = await Promise.all([
     readMultiplier({
       contractAddress:
         stockToken.deployment.contractAddress,
       rpcUrl: input.rpcUrl,
     }),
-
     readOracle({
-      feedAddress: input.feedAddress,
+      feedAddress:
+        feedMetadata.proxyAddress,
       rpcUrl: input.rpcUrl,
     }),
-
-    readFeedMetadata(
-      input.feedAddress,
-    ),
   ]);
 
   /*

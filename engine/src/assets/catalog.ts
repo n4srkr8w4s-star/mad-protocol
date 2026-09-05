@@ -14,7 +14,6 @@ export interface MADAssetDefinition {
   address: string;
 
   underlyingSymbol?: string;
-  oracleFeedAddress?: string;
 
   description?: string;
 }
@@ -41,8 +40,6 @@ export const MAD_ASSETS: MADAssetDefinition[] = [
     address:
       "0xaF3D76f1834A1d425780943C99Ea8A608f8a93f9",
     underlyingSymbol: "AAPL",
-    oracleFeedAddress:
-      "0x6B22A786bAa607d76728168703a39Ea9C99f2cD0",
     description:
       "Apple Stock Token on Robinhood Chain monitored by MAD.",
   },

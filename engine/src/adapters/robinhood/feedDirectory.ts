@@ -85,6 +85,58 @@ function findByProxyAddress(
   return undefined;
 }
 
+function findPrimaryTokenizedPriceFeedsBySymbol(
+  value: unknown,
+  symbol: string,
+  matches: Record<string, unknown>[] = [],
+): Record<string, unknown>[] {
+  if (Array.isArray(value)) {
+    for (const item of value) {
+      findPrimaryTokenizedPriceFeedsBySymbol(
+        item,
+        symbol,
+        matches,
+      );
+    }
+
+    return matches;
+  }
+
+  if (!isRecord(value)) {
+    return matches;
+  }
+
+  const docs =
+    isRecord(value.docs)
+      ? value.docs
+      : null;
+
+  if (
+    docs &&
+    typeof value.proxyAddress === "string" &&
+    typeof docs.baseAsset === "string" &&
+    typeof docs.quoteAsset === "string" &&
+    typeof docs.productTypeCode === "string" &&
+    docs.baseAsset.toUpperCase() ===
+      symbol.toUpperCase() &&
+    docs.quoteAsset.toUpperCase() === "USD" &&
+    docs.productTypeCode ===
+      "primaryTokenizedPrice"
+  ) {
+    matches.push(value);
+  }
+
+  for (const child of Object.values(value)) {
+    findPrimaryTokenizedPriceFeedsBySymbol(
+      child,
+      symbol,
+      matches,
+    );
+  }
+
+  return matches;
+}
+
 export function parseRobinhoodFeedMetadata(
   payload: unknown,
   proxyAddress: string,
@@ -205,6 +257,52 @@ export function parseRobinhoodFeedMetadata(
   };
 }
 
+export function parseRobinhoodFeedMetadataBySymbol(
+  payload: unknown,
+  symbol: string,
+): RobinhoodFeedMetadata {
+  const canonicalSymbol =
+    symbol.trim().toUpperCase();
+
+  if (!canonicalSymbol) {
+    throw new Error(
+      "Robinhood feed symbol is required",
+    );
+  }
+
+  const matches =
+    findPrimaryTokenizedPriceFeedsBySymbol(
+      payload,
+      canonicalSymbol,
+    );
+
+  if (matches.length === 0) {
+    throw new Error(
+      `Robinhood primary tokenized price feed not found for: ${canonicalSymbol}`,
+    );
+  }
+
+  if (matches.length > 1) {
+    throw new Error(
+      `Ambiguous Robinhood primary tokenized price feeds for: ${canonicalSymbol}`,
+    );
+  }
+
+  const proxyAddress =
+    matches[0]?.proxyAddress;
+
+  if (typeof proxyAddress !== "string") {
+    throw new Error(
+      `Invalid Robinhood feed directory entry for: ${canonicalSymbol}`,
+    );
+  }
+
+  return parseRobinhoodFeedMetadata(
+    payload,
+    proxyAddress,
+  );
+}
+
 export async function fetchRobinhoodFeedMetadata(
   proxyAddress: string,
   fetchFn: typeof fetch = fetch,
@@ -231,5 +329,35 @@ export async function fetchRobinhoodFeedMetadata(
   return parseRobinhoodFeedMetadata(
     payload,
     proxyAddress,
+  );
+}
+
+
+export async function fetchRobinhoodFeedMetadataBySymbol(
+  symbol: string,
+  fetchFn: typeof fetch = fetch,
+): Promise<RobinhoodFeedMetadata> {
+  const response =
+    await fetchFn(
+      ROBINHOOD_FEED_DIRECTORY_URL,
+      {
+        headers: {
+          accept: "application/json",
+        },
+      },
+    );
+
+  if (!response.ok) {
+    throw new Error(
+      `Robinhood feed directory request failed: HTTP ${response.status}`,
+    );
+  }
+
+  const payload: unknown =
+    await response.json();
+
+  return parseRobinhoodFeedMetadataBySymbol(
+    payload,
+    symbol,
   );
 }

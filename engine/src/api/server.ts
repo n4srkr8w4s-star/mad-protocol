@@ -141,20 +141,9 @@ export function createMADApi(
         asset.type ===
         "ROBINHOOD_STOCK_TOKEN"
       ) {
-        if (!asset.oracleFeedAddress) {
-          return reply.code(500).send({
-            error:
-              "MAD_ASSET_CONFIGURATION_ERROR",
-            message:
-              "Robinhood Stock Token is missing oracle configuration.",
-          });
-        }
-
         const composite =
           await evaluateRobinhoodComposite({
             symbol: asset.symbol,
-            feedAddress:
-              asset.oracleFeedAddress,
             rpcUrl:
               process.env
                 .ROBINHOOD_MAINNET_RPC ??

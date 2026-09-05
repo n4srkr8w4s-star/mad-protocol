@@ -178,7 +178,7 @@ function baseDependencies() {
     readOracle:
       async () => AAPL_ORACLE,
 
-    readFeedMetadata:
+    resolveFeedMetadata:
       async () => AAPL_FEED_METADATA,
   };
 }
@@ -191,9 +191,6 @@ describe(
         await evaluateRobinhoodCompositeState(
           {
             symbol: "AAPL",
-
-            feedAddress:
-              AAPL_ORACLE.feedAddress,
 
             rpcUrl:
               "https://example.invalid",
@@ -245,9 +242,6 @@ describe(
         await evaluateRobinhoodCompositeState(
           {
             symbol: "AAPL",
-
-            feedAddress:
-              AAPL_ORACLE.feedAddress,
 
             rpcUrl:
               "https://example.invalid",
@@ -314,9 +308,6 @@ describe(
         {
           symbol: "AAPL",
 
-          feedAddress:
-            AAPL_ORACLE.feedAddress,
-
           rpcUrl:
             "https://example.invalid",
 
@@ -345,7 +336,7 @@ describe(
             return AAPL_ORACLE;
           },
 
-          readFeedMetadata: async () => {
+          resolveFeedMetadata: async () => {
             feedMetadataCalls += 1;
             return AAPL_FEED_METADATA;
           },
@@ -364,9 +355,6 @@ describe(
         await evaluateRobinhoodCompositeState(
           {
             symbol: "AAPL",
-
-            feedAddress:
-              AAPL_ORACLE.feedAddress,
 
             rpcUrl:
               "https://example.invalid",

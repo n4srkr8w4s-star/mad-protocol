@@ -6,6 +6,7 @@ import {
 
 import {
   parseRobinhoodFeedMetadata,
+  parseRobinhoodFeedMetadataBySymbol,
 } from "../src/adapters/robinhood/feedDirectory.js";
 
 const AAPL_PROXY =
@@ -164,5 +165,101 @@ describe(
         "Robinhood feed not found in directory",
       );
     });
+
+    it("resolves the canonical feed by stock symbol", () => {
+      const feed =
+        parseRobinhoodFeedMetadataBySymbol(
+          DIRECTORY_PAYLOAD,
+          "AAPL",
+        );
+
+      expect(feed.proxyAddress).toBe(
+        AAPL_PROXY,
+      );
+
+      expect(feed.baseAsset).toBe(
+        "AAPL",
+      );
+
+      expect(
+        feed.productTypeCode,
+      ).toBe(
+        "primaryTokenizedPrice",
+      );
+    });
+
+    it("resolves stock symbols case-insensitively", () => {
+      const feed =
+        parseRobinhoodFeedMetadataBySymbol(
+          DIRECTORY_PAYLOAD,
+          "aapl",
+        );
+
+      expect(feed.proxyAddress).toBe(
+        AAPL_PROXY,
+      );
+    });
+
+    it("ignores non-primary feeds for the same asset", () => {
+      const payload = [
+        ...DIRECTORY_PAYLOAD,
+        {
+          ...DIRECTORY_PAYLOAD[0],
+          proxyAddress:
+            "0x1111111111111111111111111111111111111111",
+          contractAddress:
+            "0x2222222222222222222222222222222222222222",
+          docs: {
+            ...DIRECTORY_PAYLOAD[0].docs,
+            productTypeCode:
+              "secondaryPrice",
+          },
+        },
+      ];
+
+      const feed =
+        parseRobinhoodFeedMetadataBySymbol(
+          payload,
+          "AAPL",
+        );
+
+      expect(feed.proxyAddress).toBe(
+        AAPL_PROXY,
+      );
+    });
+
+    it("rejects a symbol with no canonical feed", () => {
+      expect(() =>
+        parseRobinhoodFeedMetadataBySymbol(
+          DIRECTORY_PAYLOAD,
+          "NVDA",
+        ),
+      ).toThrow(
+        "Robinhood primary tokenized price feed not found for: NVDA",
+      );
+    });
+
+    it("rejects ambiguous primary feeds", () => {
+      const payload = [
+        ...DIRECTORY_PAYLOAD,
+        {
+          ...DIRECTORY_PAYLOAD[0],
+          proxyAddress:
+            "0x1111111111111111111111111111111111111111",
+          contractAddress:
+            "0x2222222222222222222222222222222222222222",
+        },
+      ];
+
+      expect(() =>
+        parseRobinhoodFeedMetadataBySymbol(
+          payload,
+          "AAPL",
+        ),
+      ).toThrow(
+        "Ambiguous Robinhood primary tokenized price feeds for: AAPL",
+      );
+    });
+
   },
 );

@@ -108,8 +108,6 @@ describe("MAD API", () => {
             "ROBINHOOD_STOCK_TOKEN",
           chainId: 4663,
           address: AAPL,
-          oracleFeedAddress:
-            AAPL_FEED,
         }),
       ]),
     );
@@ -365,10 +363,6 @@ describe("MAD API", () => {
           expect(
             input.symbol,
           ).toBe("AAPL");
-
-          expect(
-            input.feedAddress,
-          ).toBe(AAPL_FEED);
 
           return composite;
         },
