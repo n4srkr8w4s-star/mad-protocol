@@ -20,8 +20,24 @@ import {
 } from "../engine/evaluateRobinhoodCompositeState.js";
 
 import {
+  resolveRobinhoodCapability,
+  type RobinhoodAssetCapability,
+} from "../engine/resolveRobinhoodCapability.js";
+
+import {
   presentRobinhoodCompositeState,
 } from "./presenters.js";
+
+type ApiAssetCapability =
+  Pick<
+    RobinhoodAssetCapability,
+    | "symbol"
+    | "name"
+    | "assetId"
+    | "capability"
+    | "supportedDisorders"
+    | "totalDisorders"
+  >;
 
 export interface MADApiDependencies {
   readSnapshot?: (config: {
@@ -31,6 +47,9 @@ export interface MADApiDependencies {
   }) => Promise<MADOnchainSnapshot>;
 
   evaluateRobinhoodComposite?: typeof evaluateRobinhoodCompositeState;
+  resolveRobinhoodCapability?: (
+    symbol: string,
+  ) => Promise<ApiAssetCapability | undefined>;
   searchRobinhoodAssets?: typeof searchRobinhoodAssets;
 
   logger?: boolean;
@@ -58,6 +77,10 @@ export function createMADApi(
   const evaluateRobinhoodComposite =
     dependencies.evaluateRobinhoodComposite ??
     evaluateRobinhoodCompositeState;
+
+  const resolveCapability =
+    dependencies.resolveRobinhoodCapability ??
+    resolveRobinhoodCapability;
 
   const searchAssets =
     dependencies.searchRobinhoodAssets ??
@@ -124,68 +147,147 @@ export function createMADApi(
   }>(
     "/api/v1/assets/:assetId/state",
     async (request, reply) => {
-      const asset =
-        getAssetById(
-          request.params.assetId,
+      const identifier =
+        request.params.assetId.trim();
+
+      /*
+       * MAD-specific catalogue assets such as tPONS
+       * retain their registry-backed path.
+       *
+       * Robinhood Stock Tokens deliberately bypass
+       * catalogue membership.
+       */
+      const catalogAsset =
+        getAssetById(identifier);
+
+      if (
+        catalogAsset &&
+        catalogAsset.type !==
+          "ROBINHOOD_STOCK_TOKEN"
+      ) {
+        const snapshot =
+          await readSnapshot({
+            registryAddress:
+              requireEnv("MAD_REGISTRY"),
+            assetAddress:
+              catalogAsset.address,
+            rpcUrl:
+              requireEnv(
+                "ROBINHOOD_TESTNET_RPC",
+              ),
+          });
+
+        return {
+          asset: {
+            id:
+              catalogAsset.id,
+            symbol:
+              catalogAsset.symbol,
+            name:
+              catalogAsset.name,
+            type:
+              catalogAsset.type,
+            address:
+              catalogAsset.address,
+            chainId:
+              catalogAsset.chainId,
+            underlyingSymbol:
+              catalogAsset.underlyingSymbol ??
+              null,
+          },
+
+          mad:
+            snapshot.mad,
+
+          provenance:
+            snapshot.provenance,
+
+          network:
+            snapshot.network,
+        };
+      }
+
+      /*
+       * Every Robinhood Stock Token is now resolved
+       * dynamically from Robinhood rather than from
+       * the MAD static catalogue.
+       */
+      const capability =
+        await resolveCapability(
+          identifier,
         );
 
-      if (!asset) {
+      if (!capability) {
         return reply.code(404).send({
-          error: "MAD_ASSET_NOT_FOUND",
+          error:
+            "MAD_ASSET_NOT_FOUND",
           message:
             "The requested asset is not monitored by MAD.",
         });
       }
 
+      /*
+       * A recognised PARTIAL/DISCOVERABLE asset is
+       * not the same thing as an unknown asset.
+       *
+       * The current composite evaluator requires FULL
+       * structural capability.
+       */
       if (
-        asset.type ===
-        "ROBINHOOD_STOCK_TOKEN"
+        capability.capability !==
+        "FULL"
       ) {
-        const composite =
-          await evaluateRobinhoodComposite({
-            symbol: asset.symbol,
-            rpcUrl:
-              process.env
-                .ROBINHOOD_MAINNET_RPC ??
-              "https://rpc.mainnet.chain.robinhood.com",
-          });
+        return reply.code(422).send({
+          error:
+            "MAD_ASSET_STATE_UNAVAILABLE",
 
-        return presentRobinhoodCompositeState(
-          asset,
-          composite,
-        );
+          message:
+            "The requested Robinhood asset does not currently have full MAD state capability.",
+
+          asset: {
+            id:
+              capability.symbol.toLowerCase(),
+            symbol:
+              capability.symbol,
+            name:
+              capability.name,
+            robinhoodAssetId:
+              capability.assetId,
+          },
+
+          capability: {
+            level:
+              capability.capability,
+            supportedDisorders:
+              capability.supportedDisorders,
+            totalDisorders:
+              capability.totalDisorders,
+          },
+        });
       }
 
-      const snapshot =
-        await readSnapshot({
-          registryAddress:
-            requireEnv("MAD_REGISTRY"),
-          assetAddress:
-            asset.address,
+      const composite =
+        await evaluateRobinhoodComposite({
+          symbol:
+            capability.symbol,
+
           rpcUrl:
-            requireEnv(
-              "ROBINHOOD_TESTNET_RPC",
-            ),
+            process.env
+              .ROBINHOOD_MAINNET_RPC ??
+            "https://rpc.mainnet.chain.robinhood.com",
         });
 
-      return {
-        asset: {
-          id: asset.id,
-          symbol: asset.symbol,
-          name: asset.name,
-          type: asset.type,
-          address: asset.address,
-          chainId: asset.chainId,
-          underlyingSymbol:
-            asset.underlyingSymbol ?? null,
+      return presentRobinhoodCompositeState(
+        composite,
+        {
+          level:
+            capability.capability,
+          supportedDisorders:
+            capability.supportedDisorders,
+          totalDisorders:
+            capability.totalDisorders,
         },
-
-        mad: snapshot.mad,
-        provenance:
-          snapshot.provenance,
-        network:
-          snapshot.network,
-      };
+      );
     },
   );
 

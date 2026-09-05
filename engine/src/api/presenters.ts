@@ -1,10 +1,10 @@
-import type {
-  MADAssetDefinition,
-} from "../assets/catalog.js";
-
 import {
   MADSeverity,
 } from "../domain/types.js";
+
+import type {
+  MADCapabilityLevel,
+} from "../engine/resolveRobinhoodCapability.js";
 
 import type {
   evaluateRobinhoodCompositeState,
@@ -16,6 +16,12 @@ type RobinhoodCompositeState =
       typeof evaluateRobinhoodCompositeState
     >
   >;
+
+export interface RobinhoodCapabilitySummary {
+  level: MADCapabilityLevel;
+  supportedDisorders: number;
+  totalDisorders: number;
+}
 
 function severityName(
   severity: MADSeverity,
@@ -29,33 +35,44 @@ function severityName(
 }
 
 export function presentRobinhoodCompositeState(
-  asset: MADAssetDefinition,
   composite: RobinhoodCompositeState,
+  capability: RobinhoodCapabilitySummary,
 ) {
   return {
     asset: {
-      id: asset.id,
-      symbol: composite.asset.symbol,
-      name: composite.asset.name,
-      type: asset.type,
-
+      id:
+        composite.asset.symbol.toLowerCase(),
+      symbol:
+        composite.asset.symbol,
+      name:
+        composite.asset.name,
+      type:
+        "ROBINHOOD_STOCK_TOKEN",
       address:
         composite.asset.contractAddress,
-
       chainId:
         composite.asset.chainId,
-
       underlyingSymbol:
-        asset.underlyingSymbol ?? null,
-
+        composite.asset.symbol,
       robinhoodAssetId:
         composite.asset.assetId,
-
       isin:
         composite.asset.isin,
-
       status:
         composite.asset.status,
+    },
+
+    /*
+     * Structural capability is deliberately
+     * separate from current assessment coverage.
+     */
+    capability: {
+      level:
+        capability.level,
+      supportedDisorders:
+        capability.supportedDisorders,
+      totalDisorders:
+        capability.totalDisorders,
     },
 
     observations:
@@ -65,23 +82,20 @@ export function presentRobinhoodCompositeState(
       assessed:
         composite.disorders.assessed.map(
           (disorder) => ({
-            id: disorder.id,
-            code: disorder.code,
-
+            id:
+              disorder.id,
+            code:
+              disorder.code,
             active:
               disorder.evaluation.active,
-
             score:
               disorder.evaluation.score,
-
             severityCode:
               disorder.evaluation.severity,
-
             severity:
               severityName(
                 disorder.evaluation.severity,
               ),
-
             reason:
               disorder.evaluation.reason,
           }),
@@ -94,18 +108,14 @@ export function presentRobinhoodCompositeState(
     mad: {
       score:
         composite.mad.disorderScore,
-
       severityCode:
         composite.mad.severity,
-
       severity:
         severityName(
           composite.mad.severity,
         ),
-
       isDisordered:
         composite.mad.disorderScore > 0,
-
       disorderBitmap:
         composite.mad.disorderBitmap.toString(),
 
@@ -114,13 +124,10 @@ export function presentRobinhoodCompositeState(
           (disorder) => ({
             id:
               disorder.disorderId,
-
             score:
               disorder.score,
-
             severityCode:
               disorder.severity,
-
             severity:
               severityName(
                 disorder.severity,

@@ -118,6 +118,9 @@ describe("MAD API", () => {
   it("returns 404 for an unknown asset", async () => {
     const app = createMADApi({
       logger: false,
+
+      resolveRobinhoodCapability:
+        async () => undefined,
     });
 
     const response =
@@ -356,6 +359,25 @@ describe("MAD API", () => {
     const app = createMADApi({
       logger: false,
 
+      resolveRobinhoodCapability:
+        async (symbol) => {
+          expect(
+            symbol.toLowerCase(),
+          ).toBe("aapl");
+
+          return {
+            symbol: "AAPL",
+            name:
+              "Apple • Robinhood Token",
+            assetId:
+              "0x00000000000000000000000000000000c2425be3658540dd8e2424cbf3c5c649",
+            capability:
+              "FULL",
+            supportedDisorders: 4,
+            totalDisorders: 4,
+          };
+        },
+
       evaluateRobinhoodComposite:
         async (input) => {
           compositeCalls += 1;
@@ -414,6 +436,188 @@ describe("MAD API", () => {
 
       marketAvailability:
         "OPEN",
+    });
+
+    await app.close();
+  });
+
+  it("returns dynamic state for a FULL Robinhood asset not in the catalog", async () => {
+    let compositeCalls = 0;
+
+    const nvdaComposite = {
+      asset: {
+        symbol: "NVDA",
+        name:
+          "NVIDIA • Robinhood Token",
+        assetId:
+          "nvda-robinhood-asset-id",
+        isin:
+          "US67066G1040",
+        status:
+          "ASSET_STATUS_ACTIVE",
+        contractAddress:
+          "0xd0601CE157Db5bdC3162BbaC2a2C8aF5320D9EEC",
+        chainId: 4663,
+      },
+
+      observations:
+        {} as CompositeResult["observations"],
+
+      disorders: {
+        assessed: [],
+        unassessed: [],
+      },
+
+      mad: {
+        disorderScore: 0,
+        severity:
+          MADSeverity.NORMAL,
+        disorderBitmap: 0n,
+        activeDisorders: [],
+        assessedDisorders: 4,
+        unassessedDisorders: 0,
+      },
+    } as CompositeResult;
+
+    const app = createMADApi({
+      logger: false,
+
+      resolveRobinhoodCapability:
+        async (symbol) => {
+          expect(
+            symbol.toLowerCase(),
+          ).toBe("nvda");
+
+          return {
+            symbol: "NVDA",
+            name:
+              "NVIDIA • Robinhood Token",
+            assetId:
+              "nvda-robinhood-asset-id",
+            capability:
+              "FULL",
+            supportedDisorders: 4,
+            totalDisorders: 4,
+          };
+        },
+
+      evaluateRobinhoodComposite:
+        async (input) => {
+          compositeCalls += 1;
+
+          expect(
+            input.symbol,
+          ).toBe("NVDA");
+
+          return nvdaComposite;
+        },
+    });
+
+    const response =
+      await app.inject({
+        method: "GET",
+        url:
+          "/api/v1/assets/nvda/state",
+      });
+
+    expect(
+      response.statusCode,
+    ).toBe(200);
+
+    expect(
+      compositeCalls,
+    ).toBe(1);
+
+    const body =
+      response.json();
+
+    expect(
+      body.asset,
+    ).toMatchObject({
+      id: "nvda",
+      symbol: "NVDA",
+      type:
+        "ROBINHOOD_STOCK_TOKEN",
+      chainId: 4663,
+    });
+
+    expect(
+      body.capability,
+    ).toEqual({
+      level: "FULL",
+      supportedDisorders: 4,
+      totalDisorders: 4,
+    });
+
+    await app.close();
+  });
+
+  it("returns explicit capability state for a PARTIAL Robinhood asset", async () => {
+    let compositeCalls = 0;
+
+    const app = createMADApi({
+      logger: false,
+
+      resolveRobinhoodCapability:
+        async (symbol) => {
+          expect(
+            symbol.toLowerCase(),
+          ).toBe("adbe");
+
+          return {
+            symbol: "ADBE",
+            name:
+              "Adobe • Robinhood Token",
+            assetId:
+              "adbe-robinhood-asset-id",
+            capability:
+              "PARTIAL",
+            supportedDisorders: 2,
+            totalDisorders: 4,
+          };
+        },
+
+      evaluateRobinhoodComposite:
+        async () => {
+          compositeCalls += 1;
+
+          throw new Error(
+            "Composite evaluator must not run for PARTIAL capability.",
+          );
+        },
+    });
+
+    const response =
+      await app.inject({
+        method: "GET",
+        url:
+          "/api/v1/assets/adbe/state",
+      });
+
+    expect(
+      response.statusCode,
+    ).toBe(422);
+
+    expect(
+      compositeCalls,
+    ).toBe(0);
+
+    expect(
+      response.json(),
+    ).toMatchObject({
+      error:
+        "MAD_ASSET_STATE_UNAVAILABLE",
+
+      asset: {
+        id: "adbe",
+        symbol: "ADBE",
+      },
+
+      capability: {
+        level: "PARTIAL",
+        supportedDisorders: 2,
+        totalDisorders: 4,
+      },
     });
 
     await app.close();
