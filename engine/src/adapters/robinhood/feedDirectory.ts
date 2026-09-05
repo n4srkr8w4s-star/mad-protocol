@@ -361,3 +361,118 @@ export async function fetchRobinhoodFeedMetadataBySymbol(
     symbol,
   );
 }
+
+function collectPrimaryTokenizedPriceFeedRecords(
+  value: unknown,
+  matches: Record<string, unknown>[] = [],
+): Record<string, unknown>[] {
+  if (Array.isArray(value)) {
+    for (const item of value) {
+      collectPrimaryTokenizedPriceFeedRecords(
+        item,
+        matches,
+      );
+    }
+
+    return matches;
+  }
+
+  if (!isRecord(value)) {
+    return matches;
+  }
+
+  const docs =
+    isRecord(value.docs)
+      ? value.docs
+      : null;
+
+  if (
+    docs &&
+    typeof value.proxyAddress === "string" &&
+    typeof docs.baseAsset === "string" &&
+    typeof docs.quoteAsset === "string" &&
+    typeof docs.productTypeCode === "string" &&
+    docs.quoteAsset.toUpperCase() === "USD" &&
+    docs.productTypeCode ===
+      "primaryTokenizedPrice"
+  ) {
+    matches.push(value);
+  }
+
+  for (const child of Object.values(value)) {
+    collectPrimaryTokenizedPriceFeedRecords(
+      child,
+      matches,
+    );
+  }
+
+  return matches;
+}
+
+export function parseRobinhoodPrimaryTokenizedPriceFeeds(
+  payload: unknown,
+): RobinhoodFeedMetadata[] {
+  const entries =
+    collectPrimaryTokenizedPriceFeedRecords(
+      payload,
+    );
+
+  const seen =
+    new Set<string>();
+
+  const feeds: RobinhoodFeedMetadata[] = [];
+
+  for (const entry of entries) {
+    const proxyAddress =
+      entry.proxyAddress;
+
+    if (typeof proxyAddress !== "string") {
+      continue;
+    }
+
+    const key =
+      proxyAddress.toLowerCase();
+
+    if (seen.has(key)) {
+      continue;
+    }
+
+    seen.add(key);
+
+    feeds.push(
+      parseRobinhoodFeedMetadata(
+        payload,
+        proxyAddress,
+      ),
+    );
+  }
+
+  return feeds;
+}
+
+export async function fetchRobinhoodPrimaryTokenizedPriceFeeds(
+  fetchFn: typeof fetch = fetch,
+): Promise<RobinhoodFeedMetadata[]> {
+  const response =
+    await fetchFn(
+      ROBINHOOD_FEED_DIRECTORY_URL,
+      {
+        headers: {
+          accept: "application/json",
+        },
+      },
+    );
+
+  if (!response.ok) {
+    throw new Error(
+      `Robinhood feed directory request failed: HTTP ${response.status}`,
+    );
+  }
+
+  const payload: unknown =
+    await response.json();
+
+  return parseRobinhoodPrimaryTokenizedPriceFeeds(
+    payload,
+  );
+}

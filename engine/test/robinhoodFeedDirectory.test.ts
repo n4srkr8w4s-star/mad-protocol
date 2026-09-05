@@ -7,6 +7,7 @@ import {
 import {
   parseRobinhoodFeedMetadata,
   parseRobinhoodFeedMetadataBySymbol,
+  parseRobinhoodPrimaryTokenizedPriceFeeds,
 } from "../src/adapters/robinhood/feedDirectory.js";
 
 const AAPL_PROXY =
@@ -259,6 +260,53 @@ describe(
       ).toThrow(
         "Ambiguous Robinhood primary tokenized price feeds for: AAPL",
       );
+    });
+
+
+    it("indexes all canonical primary tokenized-price feeds", () => {
+      const feeds =
+        parseRobinhoodPrimaryTokenizedPriceFeeds(
+          DIRECTORY_PAYLOAD,
+        );
+
+      expect(feeds).toHaveLength(1);
+
+      expect(
+        feeds[0]?.baseAsset,
+      ).toBe("AAPL");
+
+      expect(
+        feeds[0]?.proxyAddress,
+      ).toBe(AAPL_PROXY);
+    });
+
+    it("excludes non-primary feeds from the bulk index", () => {
+      const payload = [
+        ...DIRECTORY_PAYLOAD,
+        {
+          ...DIRECTORY_PAYLOAD[0],
+          proxyAddress:
+            "0x1111111111111111111111111111111111111111",
+          contractAddress:
+            "0x2222222222222222222222222222222222222222",
+          docs: {
+            ...DIRECTORY_PAYLOAD[0].docs,
+            productTypeCode:
+              "secondaryPrice",
+          },
+        },
+      ];
+
+      const feeds =
+        parseRobinhoodPrimaryTokenizedPriceFeeds(
+          payload,
+        );
+
+      expect(feeds).toHaveLength(1);
+
+      expect(
+        feeds[0]?.proxyAddress,
+      ).toBe(AAPL_PROXY);
     });
 
   },

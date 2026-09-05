@@ -101,34 +101,13 @@ function capabilityLevel(
   return "DISCOVERABLE";
 }
 
-export async function resolveRobinhoodCapability(
-  symbol: string,
-  dependencies: RobinhoodCapabilityDependencies = {},
-): Promise<RobinhoodAssetCapability | undefined> {
-  const getAsset =
-    dependencies.getAsset ??
-    ((value: string) =>
-      getRobinhoodAssetBySymbol(value));
-
-  const getFeed =
-    dependencies.getFeed ??
-    defaultFeedLookup;
-
-  const asset =
-    await getAsset(symbol);
-
-  if (!asset) {
-    return undefined;
-  }
-
+export function buildRobinhoodCapability(
+  asset: RobinhoodStockTokenAsset,
+  feed: RobinhoodFeedMetadata | undefined,
+): RobinhoodAssetCapability {
   const deployment =
     getRobinhoodChainDeployment(asset);
 
-  /*
-   * Without a Robinhood Chain deployment MAD can
-   * discover the asset but cannot perform the current
-   * onchain Stock Token disorder model.
-   */
   if (!deployment) {
     const disorders: MADDisorderCapability[] = [
       {
@@ -184,16 +163,6 @@ export async function resolveRobinhoodCapability(
     };
   }
 
-  const feed =
-    await getFeed(asset.tokenSymbol);
-
-  /*
-   * AD-002 and AD-004 are supported by the Robinhood
-   * Stock Token + Robinhood Chain deployment model.
-   *
-   * AD-005 and AD-008 additionally require canonical
-   * feed metadata and known market-hour semantics.
-   */
   const hasCanonicalFeed =
     feed !== undefined;
 
@@ -295,4 +264,35 @@ export async function resolveRobinhoodCapability(
 
     disorders,
   };
+}
+
+export async function resolveRobinhoodCapability(
+  symbol: string,
+  dependencies: RobinhoodCapabilityDependencies = {},
+): Promise<RobinhoodAssetCapability | undefined> {
+  const getAsset =
+    dependencies.getAsset ??
+    ((value: string) =>
+      getRobinhoodAssetBySymbol(value));
+
+  const getFeed =
+    dependencies.getFeed ??
+    defaultFeedLookup;
+
+  const asset =
+    await getAsset(symbol);
+
+  if (!asset) {
+    return undefined;
+  }
+
+  const feed =
+    await getFeed(
+      asset.tokenSymbol,
+    );
+
+  return buildRobinhoodCapability(
+    asset,
+    feed,
+  );
 }
