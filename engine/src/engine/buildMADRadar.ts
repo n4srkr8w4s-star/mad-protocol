@@ -15,6 +15,15 @@ import {
   createRetryingRobinhoodPriceLookup,
 } from "./retryingRobinhoodPriceLookup.js";
 
+import type {
+  RobinhoodPriceRetryEvent,
+} from "./retryingRobinhoodPriceLookup.js";
+
+import {
+  buildRobinhoodPriceSourceHealth,
+  type RobinhoodPriceSourceHealth,
+} from "./robinhoodPriceSourceHealth.js";
+
 import {
   scanRobinhoodUniverse,
   type MADFeedResolution,
@@ -89,6 +98,11 @@ export interface MADRadarSnapshot {
 
     disordered: number;
     normal: number;
+  };
+
+  sourceHealth: {
+    robinhoodPrices:
+      RobinhoodPriceSourceHealth;
   };
 
   assets: MADRadarAsset[];
@@ -202,6 +216,9 @@ export async function buildMADRadar(
   const concurrency =
     input.concurrency ?? 4;
 
+  const priceRetryEvents:
+    RobinhoodPriceRetryEvent[] = [];
+
   const getPrice =
     dependencies.getPrice ??
     createRetryingRobinhoodPriceLookup({
@@ -217,6 +234,13 @@ export async function buildMADRadar(
       maxAttempts: 3,
 
       baseBackoffMs: 1_000,
+
+      onEvent:
+        (event) => {
+          priceRetryEvents.push(
+            event,
+          );
+        },
     });
 
   const universe =
@@ -486,6 +510,11 @@ export async function buildMADRadar(
         "ASSESSED",
     );
 
+  const robinhoodPriceSourceHealth =
+    buildRobinhoodPriceSourceHealth(
+      priceRetryEvents,
+    );
+
   return {
     generatedAt:
       now().toISOString(),
@@ -533,6 +562,11 @@ export async function buildMADRadar(
           (asset) =>
             asset.state?.score === 0,
         ).length,
+    },
+
+    sourceHealth: {
+      robinhoodPrices:
+        robinhoodPriceSourceHealth,
     },
 
     assets,
