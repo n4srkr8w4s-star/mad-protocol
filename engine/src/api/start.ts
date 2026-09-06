@@ -1,7 +1,9 @@
 import { createMADApi } from "./server.js";
 
 const PORT = Number(
-  process.env.MAD_API_PORT ?? "3000",
+  process.env.MAD_API_PORT ??
+    process.env.PORT ??
+    "3000",
 );
 
 const HOST =
