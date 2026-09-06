@@ -147,6 +147,29 @@ export function createMADApi(
     methods: ["GET"],
   });
 
+  app.get("/", async () => {
+    return {
+      service: "MAD API",
+      status: "working-alpha",
+      description:
+        "Machine-readable state infrastructure for tokenised assets on Robinhood Chain.",
+      observatory:
+        "https://mad-observatory.onrender.com",
+      endpoints: {
+        health:
+          "/health",
+        assets:
+          "/api/v1/assets",
+        assetSearch:
+          "/api/v1/assets/search?q=NVDA",
+        assetState:
+          "/api/v1/assets/NVDA/state",
+        radar:
+          "/api/v1/radar",
+      },
+    };
+  });
+
   app.get("/health", async () => {
     return {
       service: "MAD API",
