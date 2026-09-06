@@ -2,6 +2,14 @@
 
 MAD is open infrastructure for detecting, representing, and eventually modelling financial disorder across tokenised assets on Robinhood Chain.
 
+## Live
+
+**MAD Observatory**  
+https://mad-observatory.onrender.com
+
+**MAD API**  
+https://mad-api-kxi9.onrender.com
+
 ## Current Status
 
 MAD V0.1 is under active development.
