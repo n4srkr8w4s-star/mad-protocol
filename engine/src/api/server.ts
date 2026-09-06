@@ -72,6 +72,26 @@ function requireEnv(name: string): string {
   return value;
 }
 
+function allowedCorsOrigins(): string[] {
+  const configured =
+    process.env.MAD_CORS_ORIGINS
+      ?.split(",")
+      .map((origin) => origin.trim())
+      .filter(Boolean);
+
+  if (
+    configured &&
+    configured.length > 0
+  ) {
+    return configured;
+  }
+
+  return [
+    "http://localhost:5173",
+    "http://127.0.0.1:5173",
+  ];
+}
+
 export function createMADApi(
   dependencies: MADApiDependencies = {},
 ) {
@@ -100,10 +120,8 @@ export function createMADApi(
   });
 
   app.register(cors, {
-    origin: [
-      "http://localhost:5173",
-      "http://127.0.0.1:5173",
-    ],
+    origin:
+      allowedCorsOrigins(),
     methods: ["GET"],
   });
 

@@ -3,6 +3,10 @@ import {
   useState,
 } from "react";
 
+import {
+  MAD_API_BASE_URL,
+} from "../config/api.js";
+
 export interface SearchResult {
   symbol: string;
   name: string;
@@ -38,7 +42,7 @@ interface AssetSearchProps {
 }
 
 const SEARCH_URL =
-  "http://127.0.0.1:3000/api/v1/assets/search";
+  `${MAD_API_BASE_URL}/api/v1/assets/search`;
 
 export function AssetSearch({
   onSelectAsset,

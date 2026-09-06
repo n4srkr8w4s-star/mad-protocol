@@ -3,10 +3,14 @@ import {
   AssetSearch,
   type SearchResult,
 } from "./components/AssetSearch.js";
+import {
+  MAD_API_BASE_URL,
+} from "./config/api.js";
+
 import "./App.css";
 
 const API_BASE_URL =
-  "http://127.0.0.1:3000/api/v1/assets";
+  `${MAD_API_BASE_URL}/api/v1/assets`;
 
 interface Disorder {
   id: number;
