@@ -29,6 +29,15 @@ import {
 } from "../engine/scanRobinhoodUniverse.js";
 
 import {
+  createMADRadarSnapshotProvider,
+} from "../engine/madRadarSnapshotProvider.js";
+
+import type {
+  MADRadarInput,
+  MADRadarSnapshot,
+} from "../engine/buildMADRadar.js";
+
+import {
   presentRobinhoodCompositeState,
 } from "./presenters.js";
 
@@ -56,6 +65,9 @@ export interface MADApiDependencies {
   ) => Promise<ApiAssetCapability | undefined>;
   searchRobinhoodAssets?: typeof searchRobinhoodAssets;
   scanRobinhoodUniverse?: typeof scanRobinhoodUniverse;
+  getRadarSnapshot?: (
+    input: MADRadarInput,
+  ) => Promise<MADRadarSnapshot>;
 
   logger?: boolean;
 }
@@ -115,6 +127,16 @@ export function createMADApi(
     dependencies.scanRobinhoodUniverse ??
     scanRobinhoodUniverse;
 
+  const radarProvider =
+    createMADRadarSnapshotProvider({
+      ttlMs: 60_000,
+    });
+
+  const getRadarSnapshot =
+    dependencies.getRadarSnapshot ??
+    ((input: MADRadarInput) =>
+      radarProvider.getSnapshot(input));
+
   const app = Fastify({
     logger: dependencies.logger ?? true,
   });
@@ -131,6 +153,20 @@ export function createMADApi(
       status: "ok",
     };
   });
+
+  app.get(
+    "/api/v1/radar",
+    async () => {
+      return getRadarSnapshot({
+        rpcUrl:
+          process.env
+            .ROBINHOOD_MAINNET_RPC ??
+          "https://rpc.mainnet.chain.robinhood.com",
+
+        concurrency: 4,
+      });
+    },
+  );
 
   app.get("/api/v1/assets", async () => {
     const universe =

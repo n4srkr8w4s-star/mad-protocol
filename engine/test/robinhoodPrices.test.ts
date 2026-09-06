@@ -6,6 +6,8 @@ import {
 
 import {
   fetchRobinhoodPrice,
+
+  RobinhoodHttpError,
   normaliseRobinhoodPrice,
 } from "../src/adapters/robinhood/prices.js";
 
@@ -71,6 +73,61 @@ describe(
         currency: "USD",
         isTradingHalt: false,
       });
+    });
+
+    it("exposes structured upstream HTTP failure evidence", async () => {
+      const fetchFn =
+        (async () => ({
+          ok: false,
+          status: 429,
+
+          text:
+            async () =>
+              "local_rate_limited",
+        })) as unknown as typeof fetch;
+
+      let captured:
+        unknown;
+
+      try {
+        await fetchRobinhoodPrice(
+          "aapl",
+          fetchFn,
+        );
+      } catch (error) {
+        captured = error;
+      }
+
+      expect(
+        captured,
+      ).toBeInstanceOf(
+        RobinhoodHttpError,
+      );
+
+      const error =
+        captured as RobinhoodHttpError;
+
+      expect(
+        error.message,
+      ).toBe(
+        "Robinhood price request failed: HTTP 429",
+      );
+
+      expect(
+        error.status,
+      ).toBe(429);
+
+      expect(
+        error.endpoint,
+      ).toBe(
+        "https://api.robinhood.com/rhj/prices/AAPL",
+      );
+
+      expect(
+        error.responseBody,
+      ).toBe(
+        "local_rate_limited",
+      );
     });
 
     it("normalises prices without floating point", () => {

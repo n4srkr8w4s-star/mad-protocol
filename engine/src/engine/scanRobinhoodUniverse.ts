@@ -21,6 +21,16 @@ export type MADFeedResolution =
 export interface RobinhoodUniverseAsset {
   capability: RobinhoodAssetCapability;
   feedResolution: MADFeedResolution;
+
+  /*
+   * Exact source observations used to derive capability.
+   * Radar reuses these rather than refetching directories
+   * independently for every FULL asset.
+   */
+  source: {
+    asset: RobinhoodStockTokenAsset;
+    feed: RobinhoodFeedMetadata | null;
+  };
 }
 
 export interface RobinhoodUniverseScan {
@@ -158,6 +168,11 @@ export async function scanRobinhoodUniverse(
     results.push({
       capability,
       feedResolution,
+
+      source: {
+        asset,
+        feed: feed ?? null,
+      },
     });
   }
 

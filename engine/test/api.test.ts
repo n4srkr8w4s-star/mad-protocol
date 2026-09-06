@@ -67,6 +67,151 @@ describe("MAD API", () => {
     await app.close();
   });
 
+  it("returns the cached MAD Radar snapshot contract", async () => {
+    let calls = 0;
+
+    const app = createMADApi({
+      logger: false,
+
+      getRadarSnapshot:
+        async (input) => {
+          calls += 1;
+
+          expect(
+            input.rpcUrl,
+          ).toBe(
+            "https://rpc.mainnet.chain.robinhood.com",
+          );
+
+          expect(
+            input.concurrency,
+          ).toBe(4);
+
+          return {
+            generatedAt:
+              "2026-09-06T02:00:00.000Z",
+
+            counts: {
+              discovered: 2,
+              full: 1,
+              partial: 1,
+              discoverable: 0,
+              assessed: 1,
+              capabilityOnly: 1,
+              errors: 0,
+              disordered: 0,
+              normal: 1,
+            },
+
+            assets: [
+              {
+                symbol: "NVDA",
+                name:
+                  "NVIDIA • Robinhood Token",
+                assetId:
+                  "nvda-asset-id",
+                isin:
+                  "US67066G1040",
+                address:
+                  "0xd0601CE157Db5bdC3162BbaC2a2C8aF5320D9EEC",
+                chainId: 4663,
+                capability: "FULL",
+                supportedDisorders: 4,
+                totalDisorders: 4,
+                feedResolution:
+                  "RESOLVED",
+                stateStatus:
+                  "ASSESSED",
+                state: {
+                  score: 0,
+                  severityCode: 0,
+                  severity:
+                    "NORMAL",
+                  assessedDisorders: 3,
+                  unassessedDisorders: 1,
+                  marketAvailability:
+                    "CLOSED",
+                  activeDisorders: [],
+                },
+                reason: null,
+              },
+
+              {
+                symbol: "ADBE",
+                name:
+                  "Adobe • Robinhood Token",
+                assetId:
+                  "adbe-asset-id",
+                isin:
+                  "US00724F1012",
+                address:
+                  "0x232B8ed6377BE97813853B0Ac104c4Cda8378d1B",
+                chainId: 4663,
+                capability:
+                  "PARTIAL",
+                supportedDisorders: 2,
+                totalDisorders: 4,
+                feedResolution:
+                  "MISSING",
+                stateStatus:
+                  "CAPABILITY_ONLY",
+                state: null,
+                reason:
+                  "MAD has partial structural capability for this asset.",
+              },
+            ],
+          };
+        },
+    });
+
+    const response =
+      await app.inject({
+        method: "GET",
+        url:
+          "/api/v1/radar",
+      });
+
+    expect(
+      response.statusCode,
+    ).toBe(200);
+
+    expect(
+      calls,
+    ).toBe(1);
+
+    expect(
+      response.json(),
+    ).toMatchObject({
+      counts: {
+        discovered: 2,
+        full: 1,
+        partial: 1,
+        assessed: 1,
+        capabilityOnly: 1,
+        errors: 0,
+      },
+
+      assets: [
+        {
+          symbol: "NVDA",
+          capability: "FULL",
+          stateStatus:
+            "ASSESSED",
+        },
+
+        {
+          symbol: "ADBE",
+          capability:
+            "PARTIAL",
+          stateStatus:
+            "CAPABILITY_ONLY",
+        },
+      ],
+    });
+
+    await app.close();
+  });
+
   it("lists MAD-specific assets and the dynamic Robinhood universe", async () => {
     const app = createMADApi({
       logger: false,

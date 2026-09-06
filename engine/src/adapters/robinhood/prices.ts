@@ -59,6 +59,38 @@ export function parseRobinhoodPricesResponse(
   };
 }
 
+export class RobinhoodHttpError extends Error {
+
+  readonly status: number;
+
+  readonly endpoint: string;
+
+  readonly responseBody: string | null;
+
+  constructor(config: {
+    status: number;
+    endpoint: string;
+    responseBody?: string | null;
+  }) {
+    super(
+      `Robinhood price request failed: HTTP ${config.status}`,
+    );
+
+    this.name =
+      "RobinhoodHttpError";
+
+    this.status =
+      config.status;
+
+    this.endpoint =
+      config.endpoint;
+
+    this.responseBody =
+      config.responseBody ?? null;
+  }
+
+}
+
 export async function fetchRobinhoodPrice(
   symbol: string,
   fetchFn: typeof fetch = fetch,
@@ -75,9 +107,29 @@ export async function fetchRobinhoodPrice(
   );
 
   if (!response.ok) {
-    throw new Error(
-      `Robinhood price request failed: HTTP ${response.status}`,
-    );
+    let responseBody:
+      string | null = null;
+
+    try {
+      responseBody =
+        (await response.text())
+          .slice(0, 500) ||
+        null;
+    } catch {
+      responseBody = null;
+    }
+
+    throw new RobinhoodHttpError({
+      status:
+        response.status,
+
+      endpoint:
+        `${ROBINHOOD_PRICES_BASE_URL}/${encodeURIComponent(
+          symbol.toUpperCase(),
+        )}`,
+
+      responseBody,
+    });
   }
 
   const payload: unknown =
