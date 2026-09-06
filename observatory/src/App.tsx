@@ -7,6 +7,10 @@ import {
   MAD_API_BASE_URL,
 } from "./config/api.js";
 
+import {
+  MADRadar,
+} from "./components/MADRadar.js";
+
 import "./App.css";
 
 const API_BASE_URL =
@@ -130,7 +134,65 @@ function publicDisorderCode(id: number): string {
   return `AD-${String(id + 1).padStart(3, "0")}`;
 }
 
+type ObservatoryView =
+  | "ASSET"
+  | "RADAR";
+
+function ViewSwitch({
+  view,
+  onChange,
+}: {
+  view: ObservatoryView;
+  onChange: (
+    view: ObservatoryView,
+  ) => void;
+}) {
+  return (
+    <div
+      className="view-switch"
+      aria-label="Observatory view"
+    >
+      <button
+        type="button"
+        className={
+          view === "ASSET"
+            ? "view-switch-active"
+            : ""
+        }
+        onClick={
+          () =>
+            onChange("ASSET")
+        }
+      >
+        ASSET STATE
+      </button>
+
+      <button
+        type="button"
+        className={
+          view === "RADAR"
+            ? "view-switch-active"
+            : ""
+        }
+        onClick={
+          () =>
+            onChange("RADAR")
+        }
+      >
+        RADAR
+      </button>
+    </div>
+  );
+}
+
 function App() {
+  const [
+    viewMode,
+    setViewMode,
+  ] = useState<ObservatoryView>(
+    "ASSET",
+  );
+
   const [state, setState] = useState<MADState | null>(null);
   const [error, setError] = useState<string | null>(null);
 
@@ -147,10 +209,21 @@ function App() {
     setSelectedAsset(result);
     setState(null);
     setError(null);
+
+    setViewMode("ASSET");
   }
 
   useEffect(() => {
     let active = true;
+
+    if (
+      viewMode === "RADAR"
+    ) {
+      return () => {
+        active = false;
+      };
+    }
+
 
     /*
      * Capability and current state are different.
@@ -219,7 +292,71 @@ function App() {
       active = false;
       window.clearInterval(refreshTimer);
     };
-  }, [selectedAsset]);
+  }, [selectedAsset, viewMode]);
+
+  if (
+    viewMode === "RADAR"
+  ) {
+    return (
+      <main className="observatory">
+        <header className="topbar">
+          <div className="brand">
+            <img
+              className="brand-logo"
+              src="/mad-logo.png"
+              alt="MAD — Ministry of Active Disorder"
+            />
+
+            <div>
+              <div className="brand-title">
+                MINISTRY OF ACTIVE DISORDER
+              </div>
+
+              <div className="brand-subtitle">
+                MAD OBSERVATORY
+              </div>
+            </div>
+          </div>
+
+          <AssetSearch
+            onSelectAsset={
+              handleSelectAsset
+            }
+          />
+
+          <ViewSwitch
+
+            view={viewMode}
+
+            onChange={
+
+              setViewMode
+
+            }
+
+          />
+
+
+          <div className="network">
+            <span className="network-dot" />
+            ROBINHOOD CHAIN · LIVE
+          </div>
+        </header>
+
+        <MADRadar />
+
+        <footer>
+          <span>
+            EXPECTED STATE − OBSERVED STATE = DISORDER
+          </span>
+
+          <span>
+            MAD RADAR · ROBINHOOD CHAIN
+          </span>
+        </footer>
+      </main>
+    );
+  }
 
   /*
    * A PARTIAL asset is a valid Robinhood asset.
@@ -262,6 +399,19 @@ function App() {
               handleSelectAsset
             }
           />
+
+          <ViewSwitch
+
+            view={viewMode}
+
+            onChange={
+
+              setViewMode
+
+            }
+
+          />
+
 
           <div className="network">
             <span className="network-dot" />
@@ -377,6 +527,19 @@ function App() {
               }
             />
 
+        <ViewSwitch
+
+          view={viewMode}
+
+          onChange={
+
+            setViewMode
+
+          }
+
+        />
+
+
         <div className="network">
             <span className="network-dot" />
             ROBINHOOD CHAIN
@@ -432,6 +595,19 @@ function App() {
                 handleSelectAsset
               }
             />
+
+        <ViewSwitch
+
+          view={viewMode}
+
+          onChange={
+
+            setViewMode
+
+          }
+
+        />
+
 
         <div className="network">
           <span className="network-dot" />
