@@ -1150,3 +1150,28 @@ footer {
 .radar-change-unavailable {
   color: #444;
 }
+
+/* ─────────────────────────────
+   MAD Radar — Cycle State Diff
+   ───────────────────────────── */
+
+.radar-cycle-change {
+  display: inline-flex;
+  align-items: center;
+  width: fit-content;
+  min-height: 20px;
+  padding: 0 7px;
+  border: 1px solid #2b2b2b;
+  font-size: 8px;
+  font-weight: 800;
+  letter-spacing: 0.12em;
+}
+
+.radar-cycle-change-stable {
+  color: #666;
+}
+
+.radar-cycle-change-active {
+  border-color: #5b451e;
+  color: #d59b2d;
+}

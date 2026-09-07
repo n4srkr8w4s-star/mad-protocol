@@ -561,6 +561,14 @@ export function MADRadar() {
       source.affectedAssets,
     );
 
+  const materialChanges =
+    operationalAssets.filter(
+      (asset) =>
+        asset.transition?.status ===
+          "DIFF_AVAILABLE" &&
+        asset.transition.changed === true,
+    ).length;
+
   return (
     <section className="radar-view">
       <div className="radar-heading">
@@ -591,6 +599,21 @@ export function MADRadar() {
             )}
           </strong>
 
+          <span
+            className={`radar-cycle-change ${
+              materialChanges > 0
+                ? "radar-cycle-change-active"
+                : "radar-cycle-change-stable"
+            }`}
+          >
+            {materialChanges > 0
+              ? `${materialChanges} MATERIAL ${
+                  materialChanges === 1
+                    ? "CHANGE"
+                    : "CHANGES"
+                }`
+              : "NO MATERIAL CHANGES"}
+          </span>
           <button
             className="radar-refresh"
             type="button"
