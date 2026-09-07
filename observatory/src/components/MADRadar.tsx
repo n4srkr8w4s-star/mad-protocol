@@ -46,6 +46,44 @@ interface RadarAssetState {
   }[];
 }
 
+type RadarChangeType =
+  | "SCORE_CHANGED"
+  | "SEVERITY_CHANGED"
+  | "DISORDER_ACTIVATED"
+  | "DISORDER_CLEARED"
+  | "DISORDER_CHANGED"
+  | "ASSESSMENT_CHANGED"
+  | "MULTIPLIER_CHANGED"
+  | "MARKET_AVAILABILITY_CHANGED";
+
+interface RadarTransition {
+  status:
+    | "BASELINE_ESTABLISHED"
+    | "DIFF_AVAILABLE";
+
+  changed:
+    boolean | null;
+
+  changeTypes:
+    RadarChangeType[];
+
+  scoreDelta:
+    number | null;
+
+  severity: {
+    previous:
+      number | null;
+    current:
+      number | null;
+    changed: boolean;
+  };
+
+  disorders: {
+    activated: number[];
+    cleared: number[];
+  };
+}
+
 interface RadarAsset {
   symbol: string;
 
@@ -75,6 +113,9 @@ interface RadarAsset {
 
   state:
     RadarAssetState | null;
+
+  transition:
+    RadarTransition | null;
 
   reason:
     string | null;
@@ -159,6 +200,157 @@ function operationalRank(
   }
 
   return 3;
+}
+
+function severityLabel(
+  code: number | null,
+): string {
+  if (code === null) {
+    return "—";
+  }
+
+  const labels: Record<
+    number,
+    string
+  > = {
+    0: "NORMAL",
+    1: "WATCH",
+    2: "ELEVATED",
+    3: "HIGH",
+    4: "CRITICAL",
+  };
+
+  return labels[code] ?? String(code);
+}
+
+function disorderLabel(
+  id: number,
+): string {
+  return `AD-${String(
+    id + 1,
+  ).padStart(3, "0")}`;
+}
+
+function RadarChange({
+  transition,
+}: {
+  transition:
+    RadarTransition | null;
+}) {
+  if (!transition) {
+    return (
+      <span className="radar-change-unavailable">
+        —
+      </span>
+    );
+  }
+
+  if (
+    transition.status ===
+    "BASELINE_ESTABLISHED"
+  ) {
+    return (
+      <div className="radar-change radar-change-baseline">
+        <strong>BASELINE</strong>
+        <span>
+          Awaiting comparison
+        </span>
+      </div>
+    );
+  }
+
+  if (
+    transition.changed === false
+  ) {
+    return (
+      <div className="radar-change radar-change-stable">
+        <strong>STABLE</strong>
+        <span>
+          No material change
+        </span>
+      </div>
+    );
+  }
+
+  if (
+    transition.changed !== true
+  ) {
+    return (
+      <div className="radar-change radar-change-baseline">
+        <strong>UNKNOWN</strong>
+        <span>
+          Comparison unavailable
+        </span>
+      </div>
+    );
+  }
+
+  const details: string[] = [];
+
+  if (
+    transition.scoreDelta !==
+      null &&
+    transition.scoreDelta !== 0
+  ) {
+    details.push(
+      `${
+        transition.scoreDelta > 0
+          ? "+"
+          : ""
+      }${transition.scoreDelta} score`,
+    );
+  }
+
+  if (
+    transition.severity.changed
+  ) {
+    details.push(
+      `${severityLabel(
+        transition.severity.previous,
+      )} → ${severityLabel(
+        transition.severity.current,
+      )}`,
+    );
+  }
+
+  for (
+    const id of
+    transition.disorders.activated
+  ) {
+    details.push(
+      `${disorderLabel(id)} +`,
+    );
+  }
+
+  for (
+    const id of
+    transition.disorders.cleared
+  ) {
+    details.push(
+      `${disorderLabel(id)} cleared`,
+    );
+  }
+
+  if (details.length === 0) {
+    details.push(
+      transition.changeTypes
+        .map((type) =>
+          type
+            .replaceAll("_", " ")
+            .toLowerCase(),
+        )
+        .join(" · "),
+    );
+  }
+
+  return (
+    <div className="radar-change radar-change-active">
+      <strong>CHANGED</strong>
+      <span>
+        {details.join(" · ")}
+      </span>
+    </div>
+  );
 }
 
 function formatTimestamp(
@@ -609,6 +801,7 @@ export function MADRadar() {
             <span>COVERAGE</span>
             <span>MARKET</span>
             <span>SOURCE</span>
+            <span>CHANGE</span>
           </div>
 
           {operationalAssets.map(
@@ -677,6 +870,11 @@ export function MADRadar() {
                       ? "RECOVERED / AFFECTED"
                       : "CLEAR"}
                   </span>
+                  <RadarChange
+                    transition={
+                      asset.transition
+                    }
+                  />
                 </div>
               );
             },
