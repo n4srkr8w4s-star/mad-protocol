@@ -1262,4 +1262,231 @@ describe("MAD API", () => {
     await app.close();
   });
 
+
+  it("returns public Evidence DNA for a FULL Robinhood asset", async () => {
+    let compositeCalls = 0;
+
+    const nvdaComposite = {
+      asset: {
+        symbol: "NVDA",
+        name:
+          "NVIDIA • Robinhood Token",
+        assetId:
+          "nvda-robinhood-asset-id",
+        isin:
+          "US67066G1040",
+        status:
+          "ASSET_STATUS_ACTIVE",
+        contractAddress:
+          "0xd0601CE157Db5bdC3162BbaC2a2C8aF5320D9EEC",
+        chainId: 4663,
+      },
+      observations:
+        {} as CompositeResult["observations"],
+      disorders: {
+        assessed: [],
+        unassessed: [],
+      },
+      mad: {
+        disorderScore: 0,
+        severity:
+          MADSeverity.NORMAL,
+        disorderBitmap: 0n,
+        activeDisorders: [],
+        assessedDisorders: 4,
+        unassessedDisorders: 0,
+      },
+    } as CompositeResult;
+
+    const app = createMADApi({
+      logger: false,
+
+      resolveRobinhoodCapability:
+        async (symbol) => {
+          expect(
+            symbol.toLowerCase(),
+          ).toBe("nvda");
+
+          return {
+            symbol: "NVDA",
+            name:
+              "NVIDIA • Robinhood Token",
+            assetId:
+              "nvda-robinhood-asset-id",
+            capability:
+              "FULL",
+            supportedDisorders: 4,
+            totalDisorders: 4,
+          };
+        },
+
+      evaluateRobinhoodComposite:
+        async (input) => {
+          compositeCalls += 1;
+
+          expect(
+            input.symbol,
+          ).toBe("NVDA");
+
+          return nvdaComposite;
+        },
+    });
+
+    const response =
+      await app.inject({
+        method: "GET",
+        url:
+          "/api/v1/assets/nvda/evidence",
+      });
+
+    expect(
+      response.statusCode,
+    ).toBe(200);
+
+    expect(
+      compositeCalls,
+    ).toBe(1);
+
+    expect(
+      response.json(),
+    ).toEqual({
+      asset: {
+        symbol: "NVDA",
+        assetId:
+          "nvda-robinhood-asset-id",
+      },
+
+      mad: {
+        score: 0,
+        severityCode:
+          MADSeverity.NORMAL,
+        severity: "NORMAL",
+        dominantDisorders: [],
+      },
+
+      disorders: [],
+    });
+
+    await app.close();
+  });
+
+  it("rejects Evidence DNA for a PARTIAL Robinhood asset", async () => {
+    let compositeCalls = 0;
+
+    const app = createMADApi({
+      logger: false,
+
+      resolveRobinhoodCapability:
+        async (symbol) => {
+          expect(
+            symbol.toLowerCase(),
+          ).toBe("adbe");
+
+          return {
+            symbol: "ADBE",
+            name:
+              "Adobe • Robinhood Token",
+            assetId:
+              "adbe-robinhood-asset-id",
+            capability:
+              "PARTIAL",
+            supportedDisorders: 2,
+            totalDisorders: 4,
+          };
+        },
+
+      evaluateRobinhoodComposite:
+        async () => {
+          compositeCalls += 1;
+
+          throw new Error(
+            "Composite evaluator must not run for PARTIAL Evidence DNA capability.",
+          );
+        },
+    });
+
+    const response =
+      await app.inject({
+        method: "GET",
+        url:
+          "/api/v1/assets/adbe/evidence",
+      });
+
+    expect(
+      response.statusCode,
+    ).toBe(422);
+
+    expect(
+      compositeCalls,
+    ).toBe(0);
+
+    expect(
+      response.json(),
+    ).toMatchObject({
+      error:
+        "MAD_ASSET_EVIDENCE_UNAVAILABLE",
+
+      asset: {
+        id: "adbe",
+        symbol: "ADBE",
+      },
+
+      capability: {
+        level: "PARTIAL",
+        supportedDisorders: 2,
+        totalDisorders: 4,
+      },
+    });
+
+    await app.close();
+  });
+
+  it("returns 404 Evidence DNA for an unknown asset", async () => {
+    let compositeCalls = 0;
+
+    const app = createMADApi({
+      logger: false,
+
+      resolveRobinhoodCapability:
+        async () =>
+          undefined,
+
+      evaluateRobinhoodComposite:
+        async () => {
+          compositeCalls += 1;
+
+          throw new Error(
+            "Composite evaluator must not run for an unknown asset.",
+          );
+        },
+    });
+
+    const response =
+      await app.inject({
+        method: "GET",
+        url:
+          "/api/v1/assets/not-real/evidence",
+      });
+
+    expect(
+      response.statusCode,
+    ).toBe(404);
+
+    expect(
+      compositeCalls,
+    ).toBe(0);
+
+    expect(
+      response.json(),
+    ).toEqual({
+      error:
+        "MAD_ASSET_NOT_FOUND",
+      message:
+        "The requested asset is not monitored by MAD.",
+    });
+
+    await app.close();
+  });
+
+
 });

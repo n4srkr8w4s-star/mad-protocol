@@ -18,6 +18,9 @@ import {
 import {
   evaluateRobinhoodCompositeState,
 } from "../engine/evaluateRobinhoodCompositeState.js";
+import {
+  buildEvidenceDNA,
+} from "../engine/buildEvidenceDNA.js";
 
 import {
   resolveRobinhoodCapability,
@@ -38,6 +41,7 @@ import type {
 } from "../engine/buildMADRadar.js";
 
 import {
+  presentMADEvidenceDNA,
   presentMADRadarSnapshot,
   presentRobinhoodCompositeState,
 } from "./presenters.js";
@@ -165,6 +169,8 @@ export function createMADApi(
           "/api/v1/assets/search?q=NVDA",
         assetState:
           "/api/v1/assets/NVDA/state",
+        assetEvidence:
+          "/api/v1/assets/NVDA/evidence",
         radar:
           "/api/v1/radar",
       },
@@ -304,6 +310,112 @@ export function createMADApi(
         count: results.length,
         results,
       };
+    },
+  );
+
+  app.get<{
+    Params: {
+      assetId: string;
+    };
+  }>(
+    "/api/v1/assets/:assetId/evidence",
+    async (request, reply) => {
+      const identifier =
+        request.params.assetId.trim();
+
+      /*
+       * Evidence DNA v1 is currently built from
+       * the Robinhood composite evaluator.
+       *
+       * Registry-only MAD catalogue assets do not
+       * yet expose equivalent deterministic evidence.
+       */
+      const catalogAsset =
+        getAssetById(identifier);
+
+      if (
+        catalogAsset &&
+        catalogAsset.type !==
+          "ROBINHOOD_STOCK_TOKEN"
+      ) {
+        return reply.code(422).send({
+          error:
+            "MAD_ASSET_EVIDENCE_UNAVAILABLE",
+          message:
+            "Evidence DNA is not currently available for this MAD asset type.",
+          asset: {
+            id:
+              catalogAsset.id,
+            symbol:
+              catalogAsset.symbol,
+            name:
+              catalogAsset.name,
+          },
+        });
+      }
+
+      const capability =
+        await resolveCapability(
+          identifier,
+        );
+
+      if (!capability) {
+        return reply.code(404).send({
+          error:
+            "MAD_ASSET_NOT_FOUND",
+          message:
+            "The requested asset is not monitored by MAD.",
+        });
+      }
+
+      if (
+        capability.capability !==
+        "FULL"
+      ) {
+        return reply.code(422).send({
+          error:
+            "MAD_ASSET_EVIDENCE_UNAVAILABLE",
+          message:
+            "The requested Robinhood asset does not currently have full MAD Evidence DNA capability.",
+          asset: {
+            id:
+              capability.symbol.toLowerCase(),
+            symbol:
+              capability.symbol,
+            name:
+              capability.name,
+            robinhoodAssetId:
+              capability.assetId,
+          },
+          capability: {
+            level:
+              capability.capability,
+            supportedDisorders:
+              capability.supportedDisorders,
+            totalDisorders:
+              capability.totalDisorders,
+          },
+        });
+      }
+
+      const composite =
+        await evaluateRobinhoodComposite({
+          symbol:
+            capability.symbol,
+          rpcUrl:
+            process.env
+              .ROBINHOOD_MAINNET_RPC ??
+            "https://rpc.mainnet.chain.robinhood.com",
+        });
+
+      const evidence =
+        buildEvidenceDNA(
+          composite,
+        );
+
+      return presentMADEvidenceDNA(
+        evidence,
+      );
     },
   );
 

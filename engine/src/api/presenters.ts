@@ -13,6 +13,9 @@ import type {
 import type {
   MADRadarSnapshot,
 } from "../engine/buildMADRadar.js";
+import type {
+  MADEvidenceDNA,
+} from "../engine/buildEvidenceDNA.js";
 
 type RobinhoodCompositeState =
   Awaited<
@@ -36,6 +39,59 @@ function severityName(
   return typeof name === "string"
     ? name
     : "UNKNOWN";
+}
+
+
+export function presentMADEvidenceDNA(
+  dna: MADEvidenceDNA,
+) {
+  return {
+    asset: {
+      symbol:
+        dna.asset.symbol,
+      assetId:
+        dna.asset.assetId,
+    },
+
+    mad: {
+      score:
+        dna.mad.score,
+      severityCode:
+        dna.mad.severity,
+      severity:
+        severityName(
+          dna.mad.severity,
+        ),
+      dominantDisorders:
+        dna.mad.dominantDisorders,
+    },
+
+    disorders:
+      dna.disorders.map(
+        (disorder) => ({
+          id:
+            disorder.id,
+          code:
+            disorder.code,
+          status:
+            disorder.status,
+          score:
+            disorder.score,
+          severityCode:
+            disorder.severity,
+          severity:
+            disorder.severity === null
+              ? null
+              : severityName(
+                  disorder.severity,
+                ),
+          reason:
+            disorder.reason,
+          evidence:
+            disorder.evidence,
+        }),
+      ),
+  };
 }
 
 export function presentRobinhoodCompositeState(
