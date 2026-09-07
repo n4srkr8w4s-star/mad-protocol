@@ -12,6 +12,14 @@ import {
   buildMADRadar,
 } from "../src/engine/buildMADRadar.js";
 
+import {
+  createInMemoryMADFlightRecorder,
+} from "../src/engine/madFlightRecorder.js";
+
+import {
+  createMADStateTracker,
+} from "../src/engine/madStateTracker.js";
+
 import type {
   RobinhoodUniverseScan,
 } from "../src/engine/scanRobinhoodUniverse.js";
@@ -549,5 +557,174 @@ describe(
         );
       },
     );
+
+    it(
+      "records successfully evaluated FULL assets at the State Diff observation boundary",
+      async () => {
+        const stateTracker =
+          createMADStateTracker();
+
+        const flightRecorder =
+          createInMemoryMADFlightRecorder();
+
+        await buildMADRadar(
+          {
+            rpcUrl:
+              "https://example.invalid",
+          },
+          {
+            scanUniverse:
+              async () =>
+                universe([
+                  universeAsset(
+                    "NVDA",
+                    "FULL",
+                  ),
+                ]),
+
+            evaluateComposite:
+              async (input) =>
+                composite(
+                  input.symbol,
+                  65,
+                ),
+
+            stateTracker,
+            flightRecorder,
+
+            now:
+              () =>
+                new Date(
+                  "2026-09-07T02:00:00.000Z",
+                ),
+          },
+        );
+
+        const history =
+          flightRecorder.history(
+            "NVDA-asset-id",
+          );
+
+        expect(
+          history,
+        ).toHaveLength(1);
+
+        expect(
+          history[0]?.recordedAt,
+        ).toBe(
+          "2026-09-07T02:00:00.000Z",
+        );
+
+        expect(
+          history[0]?.transition.status,
+        ).toBe(
+          "BASELINE_ESTABLISHED",
+        );
+
+        expect(
+          history[0]?.mad.score,
+        ).toBe(65);
+
+        expect(
+          history[0]?.evidence.mad.score,
+        ).toBe(65);
+      },
+    );
+
+    it(
+      "does not record failed FULL or capability-only assets",
+      async () => {
+        const stateTracker =
+          createMADStateTracker();
+
+        const flightRecorder =
+          createInMemoryMADFlightRecorder();
+
+        await buildMADRadar(
+          {
+            rpcUrl:
+              "https://example.invalid",
+          },
+          {
+            scanUniverse:
+              async () =>
+                universe([
+                  universeAsset(
+                    "NVDA",
+                    "FULL",
+                  ),
+                  universeAsset(
+                    "ADBE",
+                    "PARTIAL",
+                  ),
+                ]),
+
+            evaluateComposite:
+              async () => {
+                throw new Error(
+                  "evaluation failed",
+                );
+              },
+
+            stateTracker,
+            flightRecorder,
+          },
+        );
+
+        expect(
+          flightRecorder.size(),
+        ).toBe(0);
+
+        expect(
+          flightRecorder.history(
+            "NVDA-asset-id",
+          ),
+        ).toHaveLength(0);
+
+        expect(
+          flightRecorder.history(
+            "ADBE-asset-id",
+          ),
+        ).toHaveLength(0);
+      },
+    );
+
+    it(
+      "does not create Flight Recorder history without State Diff tracking",
+      async () => {
+        const flightRecorder =
+          createInMemoryMADFlightRecorder();
+
+        await buildMADRadar(
+          {
+            rpcUrl:
+              "https://example.invalid",
+          },
+          {
+            scanUniverse:
+              async () =>
+                universe([
+                  universeAsset(
+                    "NVDA",
+                    "FULL",
+                  ),
+                ]),
+
+            evaluateComposite:
+              async (input) =>
+                composite(
+                  input.symbol,
+                ),
+
+            flightRecorder,
+          },
+        );
+
+        expect(
+          flightRecorder.size(),
+        ).toBe(0);
+      },
+    );
+
   },
 );

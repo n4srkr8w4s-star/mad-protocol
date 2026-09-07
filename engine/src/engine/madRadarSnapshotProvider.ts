@@ -9,6 +9,11 @@ import {
   createMADStateTracker,
 } from "./madStateTracker.js";
 
+import {
+  createInMemoryMADFlightRecorder,
+  type MADFlightRecord,
+} from "./madFlightRecorder.js";
+
 export interface MADRadarSnapshotProviderOptions {
   ttlMs?: number;
 
@@ -25,6 +30,10 @@ export interface MADRadarSnapshotProvider {
     input: MADRadarInput,
     dependencies?: MADRadarDependencies,
   ): Promise<MADRadarSnapshot>;
+  history(
+    assetId: string,
+  ): readonly MADFlightRecord[];
+
 
   clear(): void;
 }
@@ -61,6 +70,13 @@ export function createMADRadarSnapshotProvider(
    */
   const stateTracker =
     createMADStateTracker();
+
+  /*
+   * Flight Recorder history shares the
+   * provider lifetime with State Diff memory.
+   */
+  const flightRecorder =
+    createInMemoryMADFlightRecorder();
 
   let cached:
     | {
@@ -109,6 +125,11 @@ export function createMADRadarSnapshotProvider(
             dependencies
               ?.stateTracker ??
             stateTracker,
+
+          flightRecorder:
+            dependencies
+              ?.flightRecorder ??
+            flightRecorder,
         },
       )
         .then(
@@ -131,6 +152,14 @@ export function createMADRadarSnapshotProvider(
 
     return inFlight;
   }
+  function history(
+    assetId: string,
+  ) {
+    return flightRecorder.history(
+      assetId,
+    );
+  }
+
 
   function clear() {
     cached = undefined;
@@ -138,6 +167,7 @@ export function createMADRadarSnapshotProvider(
 
   return {
     getSnapshot,
+    history,
     clear,
   };
 }

@@ -8,6 +8,10 @@ import {
   createMADRadarSnapshotProvider,
 } from "../src/engine/madRadarSnapshotProvider.js";
 
+import {
+  buildMADFlightRecord,
+} from "../src/engine/madFlightRecorder.js";
+
 import type {
   MADRadarSnapshot,
 } from "../src/engine/buildMADRadar.js";
@@ -358,6 +362,26 @@ describe(
                     composite,
                   );
 
+                const recorder =
+                  dependencies
+                    ?.flightRecorder;
+
+                if (!recorder) {
+                  throw new Error(
+                    "Flight recorder was not injected.",
+                  );
+                }
+
+                recorder.append(
+                  buildMADFlightRecord(
+                    composite,
+                    transition,
+                    new Date(
+                      `2026-09-07T00:0${builds}:00.000Z`,
+                    ),
+                  ),
+                );
+
                 return {
                   generatedAt:
                     `snapshot-${builds}`,
@@ -474,6 +498,12 @@ describe(
         expect(builds).toBe(1);
         expect(cached).toBe(first);
 
+        expect(
+          provider.history(
+            "aapl-id",
+          ),
+        ).toHaveLength(1);
+
         time += 30_001;
 
         const second =
@@ -498,6 +528,27 @@ describe(
             ?.diff
             ?.score.delta,
         ).toBe(25);
+
+        const history =
+          provider.history(
+            "aapl-id",
+          );
+
+        expect(
+          history,
+        ).toHaveLength(2);
+
+        expect(
+          history[0]?.transition.status,
+        ).toBe(
+          "BASELINE_ESTABLISHED",
+        );
+
+        expect(
+          history[1]?.transition.status,
+        ).toBe(
+          "DIFF_AVAILABLE",
+        );
       },
     );
   },

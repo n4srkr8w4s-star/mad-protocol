@@ -35,6 +35,11 @@ import type {
   MADStateTrackingResult,
 } from "./madStateTracker.js";
 
+import {
+  buildMADFlightRecord,
+  type MADFlightRecorder,
+} from "./madFlightRecorder.js";
+
 export type MADRadarStateStatus =
   | "ASSESSED"
   | "CAPABILITY_ONLY"
@@ -134,6 +139,9 @@ export interface MADRadarDependencies {
 
   stateTracker?:
     MADStateTracker;
+
+  flightRecorder?:
+    MADFlightRecorder;
 
   now?: () => Date;
 
@@ -317,6 +325,27 @@ export async function buildMADRadar(
             dependencies.stateTracker
               ?.observe(composite) ??
             null;
+
+          /*
+           * Flight Recorder shares the same
+           * successful FULL observation boundary
+           * as State Diff.
+           *
+           * It never creates an independent
+           * transition or observation sequence.
+           */
+          if (
+            transition &&
+            dependencies.flightRecorder
+          ) {
+            dependencies.flightRecorder.append(
+              buildMADFlightRecord(
+                composite,
+                transition,
+                now(),
+              ),
+            );
+          }
 
           return {
             symbol:
