@@ -13,6 +13,10 @@ import {
   evaluateRobinhoodCompositeState,
 } from "../src/engine/evaluateRobinhoodCompositeState.js";
 
+import {
+  buildEvidenceDNA,
+} from "../src/engine/buildEvidenceDNA.js";
+
 const AAPL = {
   id: "0x00000000000000000000000000000000c2425be3658540dd8e2424cbf3c5c649",
   tokenSymbol: "AAPL",
@@ -470,6 +474,154 @@ describe(
             ActiveDisorderId.ORACLE_DEVIATION,
         ),
       ).toBe(false);
+    });
+
+
+    it("builds deterministic Evidence DNA for a normal state", async () => {
+      const result =
+        await evaluateRobinhoodCompositeState(
+          {
+            symbol: "AAPL",
+            rpcUrl:
+              "https://example.invalid",
+            evaluationTimeUnix:
+              1788509000n,
+          },
+          baseDependencies(),
+        );
+
+      const dna =
+        buildEvidenceDNA(result);
+
+      expect(dna.asset.symbol).toBe("AAPL");
+      expect(dna.mad.score).toBe(0);
+      expect(
+        dna.mad.dominantDisorders,
+      ).toEqual([]);
+
+      expect(
+        dna.disorders.every(
+          (disorder) =>
+            disorder.status ===
+            "INACTIVE",
+        ),
+      ).toBe(true);
+    });
+
+    it("extracts deterministic rule evidence", async () => {
+      const result =
+        await evaluateRobinhoodCompositeState(
+          {
+            symbol: "AAPL",
+            rpcUrl:
+              "https://example.invalid",
+            evaluationTimeUnix:
+              1788509000n,
+          },
+          baseDependencies(),
+        );
+
+      const dna =
+        buildEvidenceDNA(result);
+
+      const multiplier =
+        dna.disorders.find(
+          (disorder) =>
+            disorder.id ===
+            ActiveDisorderId.MULTIPLIER_TRANSITION,
+        );
+
+      expect(
+        multiplier?.evidence.map(
+          (fact) => fact.key,
+        ),
+      ).toEqual([
+        "currentMultiplierMatches",
+        "transitionPending",
+        "expectedCurrentE18",
+        "observedOnchainE18",
+        "pendingE18",
+      ]);
+
+      const oracle =
+        dna.disorders.find(
+          (disorder) =>
+            disorder.id ===
+            ActiveDisorderId.ORACLE_DEVIATION,
+        );
+
+      expect(
+        oracle?.evidence.map(
+          (fact) => fact.key,
+        ),
+      ).toEqual([
+        "expectedPriceE18",
+        "observedPriceE18",
+        "deviationBps",
+        "direction",
+      ]);
+    });
+
+    it("marks the score-setting disorder as DOMINANT", async () => {
+      const result =
+        await evaluateRobinhoodCompositeState(
+          {
+            symbol: "AAPL",
+            rpcUrl:
+              "https://example.invalid",
+            evaluationTimeUnix:
+              1788509000n,
+          },
+          baseDependencies(),
+        );
+
+      const halt =
+        result.disorders.assessed.find(
+          (disorder) =>
+            disorder.id ===
+            ActiveDisorderId.UNDERLYING_TRADING_HALT,
+        );
+
+      if (!halt) {
+        throw new Error(
+          "Trading-halt evaluation missing",
+        );
+      }
+
+      halt.evaluation.active = true;
+      halt.evaluation.score = 80;
+      halt.evaluation.severity =
+        MADSeverity.CRITICAL;
+
+      result.mad.disorderScore = 80;
+      result.mad.severity =
+        MADSeverity.CRITICAL;
+      result.mad.activeDisorders = [
+        {
+          disorderId:
+            ActiveDisorderId.UNDERLYING_TRADING_HALT,
+          score: 80,
+          severity:
+            MADSeverity.CRITICAL,
+        },
+      ];
+
+      const dna =
+        buildEvidenceDNA(result);
+
+      expect(
+        dna.mad.dominantDisorders,
+      ).toEqual([
+        ActiveDisorderId.UNDERLYING_TRADING_HALT,
+      ]);
+
+      expect(
+        dna.disorders.find(
+          (disorder) =>
+            disorder.id ===
+            ActiveDisorderId.UNDERLYING_TRADING_HALT,
+        )?.status,
+      ).toBe("DOMINANT");
     });
 
   },
