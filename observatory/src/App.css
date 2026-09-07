@@ -1175,3 +1175,168 @@ footer {
   border-color: #5b451e;
   color: #d59b2d;
 }
+
+/* ─────────────────────────────
+   MAD Evidence DNA
+   ───────────────────────────── */
+
+.dna-panel {
+  margin-top: 18px;
+  border: 1px solid #242424;
+  background: rgba(10, 10, 10, 0.72);
+}
+
+.dna-header {
+  min-height: 86px;
+  padding: 22px 24px;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  border-bottom: 1px solid #242424;
+}
+
+.dna-header .eyebrow {
+  margin-bottom: 5px;
+}
+
+.dna-header h2 {
+  margin: 0;
+  font-size: 19px;
+}
+
+.dna-composite {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-end;
+  gap: 4px;
+}
+
+.dna-composite span {
+  font-size: 9px;
+  letter-spacing: 0.18em;
+  color: #666;
+}
+
+.dna-composite strong {
+  font-size: 13px;
+  letter-spacing: 0.08em;
+}
+
+.dna-disorders {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+}
+
+.dna-disorder {
+  min-width: 0;
+  padding: 24px;
+  border-bottom: 1px solid #1d1d1d;
+}
+
+.dna-disorder:nth-child(odd) {
+  border-right: 1px solid #1d1d1d;
+}
+
+.dna-disorder-heading {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 18px;
+}
+
+.dna-disorder-heading > div {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.dna-disorder-heading strong {
+  font-size: 13px;
+  font-weight: 600;
+}
+
+.dna-code {
+  font-size: 10px;
+  letter-spacing: 0.12em;
+  color: #a31818;
+}
+
+.dna-status {
+  padding: 6px 8px;
+  border: 1px solid #343434;
+  font-size: 9px;
+  letter-spacing: 0.12em;
+  white-space: nowrap;
+}
+
+.dna-dominant .dna-status {
+  border-color: #8f1818;
+  color: #e14a4a;
+}
+
+.dna-active .dna-status {
+  border-color: #6b4d1d;
+  color: #d59b2d;
+}
+
+.dna-inactive .dna-status {
+  color: #888;
+}
+
+.dna-unassessed .dna-status {
+  border-style: dashed;
+  color: #777;
+}
+
+.dna-reason {
+  min-height: 32px;
+  margin: 16px 0;
+  font-size: 11px;
+  line-height: 1.5;
+  color: #747474;
+}
+
+.dna-facts {
+  margin: 0;
+}
+
+.dna-facts div {
+  min-height: 34px;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 20px;
+  border-top: 1px solid #191919;
+}
+
+.dna-facts dt {
+  overflow-wrap: anywhere;
+  font-size: 10px;
+  color: #626262;
+}
+
+.dna-facts dd {
+  margin: 0;
+  overflow-wrap: anywhere;
+  text-align: right;
+  font-size: 10px;
+  font-weight: 600;
+}
+
+.dna-unassessed {
+  padding: 14px 0;
+  border-top: 1px dashed #292929;
+  font-size: 9px;
+  letter-spacing: 0.13em;
+  color: #656565;
+}
+
+@media (max-width: 900px) {
+  .dna-disorders {
+    grid-template-columns: 1fr;
+  }
+
+  .dna-disorder:nth-child(odd) {
+    border-right: 0;
+  }
+}

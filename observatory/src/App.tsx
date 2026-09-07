@@ -26,6 +26,44 @@ interface Disorder {
   reason: string;
 }
 
+type EvidenceDNAStatus =
+  | "DOMINANT"
+  | "ACTIVE"
+  | "INACTIVE"
+  | "UNASSESSED";
+
+type EvidenceDNAValue =
+  | string
+  | number
+  | boolean
+  | null;
+
+interface EvidenceDNA {
+  asset: {
+    symbol: string;
+    assetId: string;
+  };
+  mad: {
+    score: number;
+    severityCode: number;
+    severity: string;
+    dominantDisorders: number[];
+  };
+  disorders: {
+    id: number;
+    code: string;
+    status: EvidenceDNAStatus;
+    score: number | null;
+    severityCode: number | null;
+    severity: string | null;
+    reason: string;
+    evidence: {
+      key: string;
+      value: EvidenceDNAValue;
+    }[];
+  }[];
+}
+
 interface MADState {
   asset: {
     id: string;
@@ -194,6 +232,8 @@ function App() {
   );
 
   const [state, setState] = useState<MADState | null>(null);
+  const [evidenceDNA, setEvidenceDNA] =
+    useState<EvidenceDNA | null>(null);
   const [error, setError] = useState<string | null>(null);
 
   const [
@@ -235,6 +275,7 @@ function App() {
       selectedAsset.monitoring !== "FULL"
     ) {
       setState(null);
+      setEvidenceDNA(null);
       setError(null);
 
       return () => {
@@ -248,10 +289,11 @@ function App() {
 
     async function loadState() {
       try {
+        const encodedSymbol =
+          encodeURIComponent(symbol);
+
         const response = await fetch(
-          `${API_BASE_URL}/${encodeURIComponent(
-            symbol,
-          )}/state`,
+          `${API_BASE_URL}/${encodedSymbol}/state`,
           {
             cache: "no-store",
           },
@@ -259,15 +301,18 @@ function App() {
 
         if (!response.ok) {
           throw new Error(
-            `MAD API returned HTTP ${response.status}`,
+            `MAD state API returned HTTP ${response.status}`,
           );
         }
 
         const payload =
-          (await response.json()) as MADState;
+          (await response.json()) as MADState & {
+            evidence: EvidenceDNA;
+          };
 
         if (active) {
           setState(payload);
+          setEvidenceDNA(payload.evidence);
           setError(null);
         }
       } catch (err) {
@@ -863,6 +908,88 @@ function App() {
           </dl>
         </article>
       </section>
+
+      {evidenceDNA && (
+        <section className="dna-panel">
+          <div className="dna-header">
+            <div>
+              <span className="eyebrow">
+                EVIDENCE DNA
+              </span>
+              <h2>Why MAD Said This</h2>
+            </div>
+
+            <div className="dna-composite">
+              <span>COMPOSITE</span>
+              <strong>
+                {evidenceDNA.mad.score}
+                {" · "}
+                {evidenceDNA.mad.severity}
+              </strong>
+            </div>
+          </div>
+
+          <div className="dna-disorders">
+            {evidenceDNA.disorders.map(
+              (disorder) => (
+                <article
+                  className={`dna-disorder dna-${disorder.status.toLowerCase()}`}
+                  key={disorder.id}
+                >
+                  <div className="dna-disorder-heading">
+                    <div>
+                      <span className="dna-code">
+                        {publicDisorderCode(
+                          disorder.id,
+                        )}
+                      </span>
+                      <strong>
+                        {disorder.code.replaceAll(
+                          "_",
+                          " ",
+                        )}
+                      </strong>
+                    </div>
+
+                    <span className="dna-status">
+                      {disorder.status}
+                    </span>
+                  </div>
+
+                  <p className="dna-reason">
+                    {disorder.reason}
+                  </p>
+
+                  {disorder.status ===
+                  "UNASSESSED" ? (
+                    <div className="dna-unassessed">
+                      NOT EVALUATED · NO EVIDENCE
+                      ASSERTED
+                    </div>
+                  ) : (
+                    <dl className="dna-facts">
+                      {disorder.evidence.map(
+                        (fact) => (
+                          <div key={fact.key}>
+                            <dt>{fact.key}</dt>
+                            <dd>
+                              {fact.value === null
+                                ? "null"
+                                : String(
+                                    fact.value,
+                                  )}
+                            </dd>
+                          </div>
+                        ),
+                      )}
+                    </dl>
+                  )}
+                </article>
+              ),
+            )}
+          </div>
+        </section>
+      )}
 
       <footer>
         <span>

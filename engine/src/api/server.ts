@@ -556,17 +556,30 @@ export function createMADApi(
             "https://rpc.mainnet.chain.robinhood.com",
         });
 
-      return presentRobinhoodCompositeState(
-        composite,
-        {
-          level:
-            capability.capability,
-          supportedDisorders:
-            capability.supportedDisorders,
-          totalDisorders:
-            capability.totalDisorders,
-        },
-      );
+      const state =
+        presentRobinhoodCompositeState(
+          composite,
+          {
+            level:
+              capability.capability,
+            supportedDisorders:
+              capability.supportedDisorders,
+            totalDisorders:
+              capability.totalDisorders,
+          },
+        );
+
+      const evidence =
+        presentMADEvidenceDNA(
+          buildEvidenceDNA(
+            composite,
+          ),
+        );
+
+      return {
+        ...state,
+        evidence,
+      };
     },
   );
 
