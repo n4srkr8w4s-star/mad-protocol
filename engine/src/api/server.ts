@@ -38,6 +38,7 @@ import type {
 } from "../engine/buildMADRadar.js";
 
 import {
+  presentMADRadarSnapshot,
   presentRobinhoodCompositeState,
 } from "./presenters.js";
 
@@ -180,7 +181,8 @@ export function createMADApi(
   app.get(
     "/api/v1/radar",
     async () => {
-      return getRadarSnapshot({
+      const snapshot =
+        await getRadarSnapshot({
         rpcUrl:
           process.env
             .ROBINHOOD_MAINNET_RPC ??
@@ -188,6 +190,10 @@ export function createMADApi(
 
         concurrency: 4,
       });
+
+      return presentMADRadarSnapshot(
+        snapshot,
+      );
     },
   );
 

@@ -10,6 +10,10 @@ import type {
   evaluateRobinhoodCompositeState,
 } from "../engine/evaluateRobinhoodCompositeState.js";
 
+import type {
+  MADRadarSnapshot,
+} from "../engine/buildMADRadar.js";
+
 type RobinhoodCompositeState =
   Awaited<
     ReturnType<
@@ -141,5 +145,140 @@ export function presentRobinhoodCompositeState(
       unassessedDisorders:
         composite.mad.unassessedDisorders,
     },
+  };
+}
+
+function presentMADRadarTransition(
+  transition:
+    MADRadarSnapshot["assets"][number]["transition"],
+) {
+  if (!transition) {
+    return null;
+  }
+
+  if (
+    transition.status ===
+    "BASELINE_ESTABLISHED"
+  ) {
+    return {
+      status:
+        "BASELINE_ESTABLISHED" as const,
+      changed: null,
+      changeTypes: [],
+      scoreDelta: null,
+      severity: {
+        previous: null,
+        current: null,
+        changed: false,
+      },
+      disorders: {
+        activated: [],
+        cleared: [],
+      },
+    };
+  }
+
+  const diff = transition.diff;
+
+  if (!diff) {
+    /*
+     * Defensive boundary:
+     * DIFF_AVAILABLE should always contain
+     * a diff, but never fabricate one.
+     */
+    return {
+      status:
+        "DIFF_AVAILABLE" as const,
+      changed: null,
+      changeTypes: [],
+      scoreDelta: null,
+      severity: {
+        previous: null,
+        current: null,
+        changed: false,
+      },
+      disorders: {
+        activated: [],
+        cleared: [],
+      },
+    };
+  }
+
+  return {
+    status:
+      "DIFF_AVAILABLE" as const,
+    changed:
+      diff.changed,
+    changeTypes:
+      diff.changeTypes,
+    scoreDelta:
+      diff.score.delta,
+    severity: {
+      previous:
+        diff.severity.previous,
+      current:
+        diff.severity.current,
+      changed:
+        diff.severity.changed,
+    },
+    disorders: {
+      activated:
+        diff.disorders.activated,
+      cleared:
+        diff.disorders.cleared,
+    },
+  };
+}
+
+export function presentMADRadarSnapshot(
+  snapshot: MADRadarSnapshot,
+) {
+  return {
+    generatedAt:
+      snapshot.generatedAt,
+
+    counts:
+      snapshot.counts,
+
+    sourceHealth:
+      snapshot.sourceHealth,
+
+    assets:
+      snapshot.assets.map(
+        (asset) => ({
+          symbol:
+            asset.symbol,
+          name:
+            asset.name,
+          assetId:
+            asset.assetId,
+          isin:
+            asset.isin,
+          address:
+            asset.address,
+          chainId:
+            asset.chainId,
+          capability:
+            asset.capability,
+          supportedDisorders:
+            asset.supportedDisorders,
+          totalDisorders:
+            asset.totalDisorders,
+          feedResolution:
+            asset.feedResolution,
+          stateStatus:
+            asset.stateStatus,
+          state:
+            asset.state,
+
+          transition:
+            presentMADRadarTransition(
+              asset.transition,
+            ),
+
+          reason:
+            asset.reason,
+        }),
+      ),
   };
 }

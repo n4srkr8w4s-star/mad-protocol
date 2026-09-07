@@ -36,6 +36,63 @@ type CompositeResult =
     >
   >;
 
+function radarSnapshotWithTransition(
+  transition: unknown,
+) {
+  return {
+    generatedAt:
+      "2026-09-07T01:00:00.000Z",
+
+    counts: {
+      discovered: 1,
+      full: 1,
+      partial: 0,
+      discoverable: 0,
+      assessed: 1,
+      capabilityOnly: 0,
+      errors: 0,
+      disordered: 0,
+      normal: 1,
+    },
+
+    sourceHealth: {},
+
+    assets: [
+      {
+        symbol: "NVDA",
+        name:
+          "NVIDIA • Robinhood Token",
+        assetId:
+          "nvda-asset-id",
+        isin:
+          "US67066G1040",
+        address:
+          "0xd0601CE157Db5bdC3162BbaC2a2C8aF5320D9EEC",
+        chainId: 4663,
+        capability: "FULL",
+        supportedDisorders: 4,
+        totalDisorders: 4,
+        feedResolution:
+          "RESOLVED",
+        stateStatus:
+          "ASSESSED",
+        state: {
+          score: 0,
+          severityCode: 0,
+          severity: "NORMAL",
+          assessedDisorders: 4,
+          unassessedDisorders: 0,
+          marketAvailability:
+            "OPEN",
+          activeDisorders: [],
+        },
+        transition,
+        reason: null,
+      },
+    ],
+  } as any;
+}
+
 afterEach(() => {
   delete process.env.MAD_REGISTRY;
   delete process.env.ROBINHOOD_TESTNET_RPC;
@@ -207,6 +264,204 @@ describe("MAD API", () => {
             "CAPABILITY_ONLY",
         },
       ],
+    });
+
+    await app.close();
+  });
+
+  it("presents an established Radar baseline without claiming no change", async () => {
+    const app = createMADApi({
+      logger: false,
+
+      getRadarSnapshot:
+        async () =>
+          radarSnapshotWithTransition({
+            status:
+              "BASELINE_ESTABLISHED",
+            asset: {
+              symbol: "NVDA",
+              assetId:
+                "nvda-asset-id",
+            },
+            diff: null,
+          }),
+    });
+
+    const response =
+      await app.inject({
+        method: "GET",
+        url: "/api/v1/radar",
+      });
+
+    expect(
+      response.statusCode,
+    ).toBe(200);
+
+    expect(
+      response.json()
+        .assets[0]
+        .transition,
+    ).toEqual({
+      status:
+        "BASELINE_ESTABLISHED",
+      changed: null,
+      changeTypes: [],
+      scoreDelta: null,
+      severity: {
+        previous: null,
+        current: null,
+        changed: false,
+      },
+      disorders: {
+        activated: [],
+        cleared: [],
+      },
+    });
+
+    await app.close();
+  });
+
+  it("presents an available Radar diff with no semantic change", async () => {
+    const app = createMADApi({
+      logger: false,
+
+      getRadarSnapshot:
+        async () =>
+          radarSnapshotWithTransition({
+            status:
+              "DIFF_AVAILABLE",
+            asset: {
+              symbol: "NVDA",
+              assetId:
+                "nvda-asset-id",
+            },
+            diff: {
+              changed: false,
+              changeTypes: [],
+              score: {
+                delta: 0,
+              },
+              severity: {
+                previous: 0,
+                current: 0,
+                changed: false,
+              },
+              disorders: {
+                activated: [],
+                cleared: [],
+              },
+            },
+          }),
+    });
+
+    const response =
+      await app.inject({
+        method: "GET",
+        url: "/api/v1/radar",
+      });
+
+    expect(
+      response.json()
+        .assets[0]
+        .transition,
+    ).toEqual({
+      status:
+        "DIFF_AVAILABLE",
+      changed: false,
+      changeTypes: [],
+      scoreDelta: 0,
+      severity: {
+        previous: 0,
+        current: 0,
+        changed: false,
+      },
+      disorders: {
+        activated: [],
+        cleared: [],
+      },
+    });
+
+    await app.close();
+  });
+
+  it("presents meaningful Radar State Diff semantics", async () => {
+    const app = createMADApi({
+      logger: false,
+
+      getRadarSnapshot:
+        async () =>
+          radarSnapshotWithTransition({
+            status:
+              "DIFF_AVAILABLE",
+            asset: {
+              symbol: "NVDA",
+              assetId:
+                "nvda-asset-id",
+            },
+            diff: {
+              changed: true,
+
+              changeTypes: [
+                "SCORE_CHANGED",
+                "SEVERITY_CHANGED",
+                "DISORDER_ACTIVATED",
+              ],
+
+              score: {
+                delta: 50,
+              },
+
+              severity: {
+                previous: 0,
+                current: 2,
+                changed: true,
+              },
+
+              disorders: {
+                activated: [1],
+                cleared: [],
+              },
+            },
+          }),
+    });
+
+    const response =
+      await app.inject({
+        method: "GET",
+        url: "/api/v1/radar",
+      });
+
+    expect(
+      response.statusCode,
+    ).toBe(200);
+
+    expect(
+      response.json()
+        .assets[0]
+        .transition,
+    ).toEqual({
+      status:
+        "DIFF_AVAILABLE",
+      changed: true,
+
+      changeTypes: [
+        "SCORE_CHANGED",
+        "SEVERITY_CHANGED",
+        "DISORDER_ACTIVATED",
+      ],
+
+      scoreDelta: 50,
+
+      severity: {
+        previous: 0,
+        current: 2,
+        changed: true,
+      },
+
+      disorders: {
+        activated: [1],
+        cleared: [],
+      },
     });
 
     await app.close();
