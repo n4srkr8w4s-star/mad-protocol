@@ -64,6 +64,78 @@ interface EvidenceDNA {
   }[];
 }
 
+interface FlightTransition {
+
+  status:
+    | "BASELINE_ESTABLISHED"
+    | "DIFF_AVAILABLE";
+
+  changed: boolean | null;
+
+  changeTypes: string[];
+
+  scoreDelta: number | null;
+
+  severity: {
+
+    previous: number | null;
+
+    current: number | null;
+
+    changed: boolean;
+
+  };
+
+  disorders: {
+
+    activated: number[];
+
+    cleared: number[];
+
+  };
+
+}
+
+interface FlightRecord {
+
+  recordedAt: string;
+
+  mad: {
+
+    score: number;
+
+    severityCode: number;
+
+    severity: string;
+
+    activeDisorders: number[];
+
+  };
+
+  transition: FlightTransition;
+
+  evidence: EvidenceDNA;
+
+}
+
+interface FlightHistory {
+
+  asset: {
+
+    symbol: string;
+
+    assetId: string;
+
+  } | null;
+
+  recordVersion: number;
+
+  count: number;
+
+  records: FlightRecord[];
+
+}
+
 interface MADState {
   asset: {
     id: string;
@@ -234,6 +306,31 @@ function App() {
   const [state, setState] = useState<MADState | null>(null);
   const [evidenceDNA, setEvidenceDNA] =
     useState<EvidenceDNA | null>(null);
+
+
+  const [
+
+    flightHistory,
+
+    setFlightHistory,
+
+  ] = useState<FlightHistory | null>(
+
+    null,
+
+  );
+
+  const [
+
+    selectedFlightIndex,
+
+    setSelectedFlightIndex,
+
+  ] = useState<number | null>(
+
+    null,
+
+  );
   const [error, setError] = useState<string | null>(null);
 
   const [
@@ -248,6 +345,13 @@ function App() {
   ) {
     setSelectedAsset(result);
     setState(null);
+
+
+    setEvidenceDNA(null);
+
+    setFlightHistory(null);
+
+    setSelectedFlightIndex(null);
     setError(null);
 
     setViewMode("ASSET");
@@ -276,6 +380,11 @@ function App() {
     ) {
       setState(null);
       setEvidenceDNA(null);
+
+
+      setFlightHistory(null);
+
+      setSelectedFlightIndex(null);
       setError(null);
 
       return () => {
@@ -315,6 +424,70 @@ function App() {
           setEvidenceDNA(payload.evidence);
           setError(null);
         }
+
+        /*
+         * Flight Recorder history is keyed
+         * by the canonical Robinhood asset ID
+         * returned by the live state response.
+         */
+        const historyAssetId =
+          payload.asset.robinhoodAssetId;
+
+        try {
+
+          const historyResponse =
+            await fetch(
+              `${API_BASE_URL}/${encodeURIComponent(
+                historyAssetId,
+              )}/history`,
+              {
+                cache: "no-store",
+              },
+            );
+
+          if (!historyResponse.ok) {
+
+            throw new Error(
+              `MAD history API returned HTTP ${historyResponse.status}`,
+            );
+
+          }
+
+          const historyPayload =
+            (await historyResponse.json()) as
+              FlightHistory;
+
+          if (active) {
+
+            setFlightHistory(
+              historyPayload,
+            );
+
+            setSelectedFlightIndex(
+              historyPayload.records.length > 0
+                ? historyPayload.records.length - 1
+                : null,
+            );
+
+          }
+
+        } catch {
+
+          /*
+           * Historical intelligence is
+           * supplementary. Failure here must
+           * not take current MAD state offline.
+           */
+          if (active) {
+
+            setFlightHistory(null);
+
+            setSelectedFlightIndex(null);
+
+          }
+
+        }
+
       } catch (err) {
         if (active) {
           setError(
@@ -908,6 +1081,273 @@ function App() {
           </dl>
         </article>
       </section>
+
+      {flightHistory &&
+        flightHistory.records.length > 0 &&
+        selectedFlightIndex !== null &&
+        (() => {
+
+          const selectedFlight =
+            flightHistory.records[
+              selectedFlightIndex
+            ];
+
+          if (!selectedFlight) {
+            return null;
+          }
+
+          const transition =
+            selectedFlight.transition;
+
+          return (
+            <section className="flight-panel">
+
+              <div className="flight-header">
+
+                <div>
+                  <span className="eyebrow">
+                    FLIGHT RECORDER
+                  </span>
+
+                  <h2>Disorder Replay</h2>
+
+                  <p>
+                    Deterministic MAD observations
+                    captured over time.
+                  </p>
+                </div>
+
+                <div className="flight-count">
+                  <span>CAPTURED</span>
+
+                  <strong>
+                    {flightHistory.count}
+                  </strong>
+
+                  <span>
+                    OBSERVATIONS
+                  </span>
+                </div>
+
+              </div>
+
+              <div className="flight-timeline">
+
+                {flightHistory.records.map(
+                  (record, index) => {
+
+                    const isSelected =
+                      index ===
+                      selectedFlightIndex;
+
+                    const isBaseline =
+                      record.transition.status ===
+                      "BASELINE_ESTABLISHED";
+
+                    const changed =
+                      record.transition.changed ===
+                      true;
+
+                    return (
+                      <button
+                        className={`flight-event${
+                          isSelected
+                            ? " flight-event-selected"
+                            : ""
+                        }`}
+                        key={`${record.recordedAt}-${index}`}
+                        type="button"
+                        onClick={() =>
+                          setSelectedFlightIndex(
+                            index,
+                          )
+                        }
+                      >
+
+                        <span className="flight-time">
+                          {new Date(
+                            record.recordedAt,
+                          ).toLocaleTimeString()}
+                        </span>
+
+                        <strong className="flight-score">
+                          SCORE {record.mad.score}
+                        </strong>
+
+                        <span className="flight-severity">
+                          {record.mad.severity}
+                        </span>
+
+                        <span className="flight-transition-label">
+                          {isBaseline
+                            ? "BASELINE"
+                            : changed
+                              ? "CHANGED"
+                              : "STABLE"}
+                        </span>
+
+                      </button>
+                    );
+                  },
+                )}
+
+              </div>
+
+              <div className="flight-detail">
+
+                <div className="flight-detail-summary">
+
+                  <div>
+                    <span>
+                      SELECTED OBSERVATION
+                    </span>
+
+                    <strong>
+                      {new Date(
+                        selectedFlight.recordedAt,
+                      ).toLocaleString()}
+                    </strong>
+                  </div>
+
+                  <div>
+                    <span>MAD STATE</span>
+
+                    <strong>
+                      {selectedFlight.mad.score}
+                      {" · "}
+                      {selectedFlight.mad.severity}
+                    </strong>
+                  </div>
+
+                  <div>
+                    <span>TRANSITION</span>
+
+                    <strong>
+                      {transition.status ===
+                      "BASELINE_ESTABLISHED"
+                        ? "BASELINE ESTABLISHED"
+                        : transition.changed
+                          ? "MATERIAL CHANGE"
+                          : "NO MATERIAL CHANGE"}
+                    </strong>
+                  </div>
+
+                </div>
+
+                {transition.status ===
+                  "DIFF_AVAILABLE" && (
+                  <div className="flight-diff">
+
+                    <div>
+                      <span>SCORE Δ</span>
+
+                      <strong>
+                        {transition.scoreDelta ===
+                        null
+                          ? "—"
+                          : transition.scoreDelta >
+                              0
+                            ? `+${transition.scoreDelta}`
+                            : String(
+                                transition.scoreDelta,
+                              )}
+                      </strong>
+                    </div>
+
+                    <div>
+                      <span>ACTIVATED</span>
+
+                      <strong>
+                        {transition.disorders
+                          .activated.length > 0
+                          ? transition.disorders
+                              .activated.map(
+                                publicDisorderCode,
+                              )
+                              .join(", ")
+                          : "NONE"}
+                      </strong>
+                    </div>
+
+                    <div>
+                      <span>CLEARED</span>
+
+                      <strong>
+                        {transition.disorders
+                          .cleared.length > 0
+                          ? transition.disorders
+                              .cleared.map(
+                                publicDisorderCode,
+                              )
+                              .join(", ")
+                          : "NONE"}
+                      </strong>
+                    </div>
+
+                  </div>
+                )}
+
+                <div className="flight-evidence">
+
+                  <div className="flight-evidence-heading">
+
+                    <div>
+                      <span className="eyebrow">
+                        HISTORICAL EVIDENCE DNA
+                      </span>
+
+                      <h3>
+                        Why MAD Said This Then
+                      </h3>
+                    </div>
+
+                    <span>
+                      CAPTURED AT OBSERVATION
+                    </span>
+
+                  </div>
+
+                  <div className="flight-evidence-list">
+
+                    {selectedFlight.evidence
+                      .disorders.map(
+                        (disorder) => (
+                          <article
+                            className="flight-evidence-row"
+                            key={disorder.id}
+                          >
+
+                            <div>
+                              <span className="dna-code">
+                                {publicDisorderCode(
+                                  disorder.id,
+                                )}
+                              </span>
+
+                              <strong>
+                                {
+                                  disorder.status
+                                }
+                              </strong>
+                            </div>
+
+                            <p>
+                              {disorder.reason}
+                            </p>
+
+                          </article>
+                        ),
+                      )}
+
+                  </div>
+
+                </div>
+
+              </div>
+
+            </section>
+          );
+        })()}
 
       {evidenceDNA && (
         <section className="dna-panel">
