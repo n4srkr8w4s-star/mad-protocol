@@ -36,12 +36,17 @@ import {
 } from "../engine/madRadarSnapshotProvider.js";
 
 import type {
+  MADFlightRecord,
+} from "../engine/madFlightRecorder.js";
+
+import type {
   MADRadarInput,
   MADRadarSnapshot,
 } from "../engine/buildMADRadar.js";
 
 import {
   presentMADEvidenceDNA,
+  presentMADFlightHistory,
   presentMADRadarSnapshot,
   presentRobinhoodCompositeState,
 } from "./presenters.js";
@@ -73,6 +78,10 @@ export interface MADApiDependencies {
   getRadarSnapshot?: (
     input: MADRadarInput,
   ) => Promise<MADRadarSnapshot>;
+
+  getFlightHistory?: (
+    assetId: string,
+  ) => readonly MADFlightRecord[];
 
   logger?: boolean;
 }
@@ -142,6 +151,11 @@ export function createMADApi(
     ((input: MADRadarInput) =>
       radarProvider.getSnapshot(input));
 
+  const getFlightHistory =
+    dependencies.getFlightHistory ??
+    ((assetId: string) =>
+      radarProvider.history(assetId));
+
   const app = Fastify({
     logger: dependencies.logger ?? true,
   });
@@ -171,6 +185,8 @@ export function createMADApi(
           "/api/v1/assets/NVDA/state",
         assetEvidence:
           "/api/v1/assets/NVDA/evidence",
+        assetHistory:
+          "/api/v1/assets/NVDA/history",
         radar:
           "/api/v1/radar",
       },
@@ -310,6 +326,34 @@ export function createMADApi(
         count: results.length,
         results,
       };
+    },
+  );
+
+  app.get<{
+    Params: {
+      assetId: string;
+    };
+  }>(
+    "/api/v1/assets/:assetId/history",
+    async (request) => {
+      const identifier =
+        request.params.assetId.trim();
+
+      /*
+       * Flight history is a read-only view
+       * of observations MAD has actually recorded.
+       *
+       * Reading history must never trigger
+       * a new market evaluation.
+       */
+      const records =
+        getFlightHistory(
+          identifier,
+        );
+
+      return presentMADFlightHistory(
+        records,
+      );
     },
   );
 

@@ -17,6 +17,10 @@ import type {
   evaluateRobinhoodCompositeState,
 } from "../src/engine/evaluateRobinhoodCompositeState.js";
 
+import type {
+  MADFlightRecord,
+} from "../src/engine/madFlightRecorder.js";
+
 const REGISTRY =
   "0x65605F7169ec0dA7aEF8178A8b7d69159b43B222";
 
@@ -91,6 +95,71 @@ function radarSnapshotWithTransition(
       },
     ],
   } as any;
+}
+
+function flightRecord(
+  recordedAt: string,
+  transition:
+    MADFlightRecord["transition"],
+  score = 0,
+  evidenceReason =
+    "No disorder condition detected.",
+): MADFlightRecord {
+  return {
+    recordVersion: 1,
+    recordedAt,
+    asset: {
+      symbol: "NVDA",
+      assetId:
+        "nvda-asset-id",
+    },
+    mad: {
+      score,
+      severity:
+        score === 0
+          ? MADSeverity.NORMAL
+          : MADSeverity.HIGH,
+      activeDisorders: [],
+    },
+    transition,
+    evidence: {
+      asset: {
+        symbol: "NVDA",
+        assetId:
+          "nvda-asset-id",
+      },
+      mad: {
+        score,
+        severity:
+          score === 0
+            ? MADSeverity.NORMAL
+            : MADSeverity.HIGH,
+        dominantDisorders: [],
+      },
+      disorders: [
+        {
+          id: 1,
+          code:
+            "UNDERLYING_TRADING_HALT",
+          status:
+            "INACTIVE",
+          score: 0,
+          severity:
+            MADSeverity.NORMAL,
+          reason:
+            evidenceReason,
+          evidence: [
+            {
+              key:
+                "isTradingHalt",
+              value: false,
+            },
+          ],
+        },
+      ],
+    },
+    observations: {} as any,
+  };
 }
 
 afterEach(() => {
@@ -1488,5 +1557,327 @@ describe("MAD API", () => {
     await app.close();
   });
 
+
+
+  it(
+    "returns an empty Flight Recorder history without evaluating the asset",
+    async () => {
+      let compositeCalls = 0;
+      let requestedAssetId:
+        string |
+        undefined;
+
+      const app = createMADApi({
+        logger: false,
+
+        evaluateRobinhoodComposite:
+          async () => {
+            compositeCalls += 1;
+            throw new Error(
+              "History must not evaluate current state.",
+            );
+          },
+
+        getFlightHistory:
+          (assetId) => {
+            requestedAssetId =
+              assetId;
+            return [];
+          },
+      });
+
+      const response =
+        await app.inject({
+          method: "GET",
+          url:
+            "/api/v1/assets/nvda-asset-id/history",
+        });
+
+      expect(
+        response.statusCode,
+      ).toBe(200);
+
+      expect(
+        requestedAssetId,
+      ).toBe(
+        "nvda-asset-id",
+      );
+
+      expect(
+        compositeCalls,
+      ).toBe(0);
+
+      expect(
+        response.json(),
+      ).toEqual({
+        asset: null,
+        recordVersion: 1,
+        count: 0,
+        records: [],
+      });
+
+      await app.close();
+    },
+  );
+
+  it(
+    "presents the first recorded observation as a baseline without claiming no change",
+    async () => {
+      const record =
+        flightRecord(
+          "2026-09-07T02:00:00.000Z",
+          {
+            status:
+              "BASELINE_ESTABLISHED",
+            asset: {
+              symbol: "NVDA",
+              assetId:
+                "nvda-asset-id",
+            },
+            diff: null,
+          },
+          0,
+          "Evidence captured at the first observation.",
+        );
+
+      const app = createMADApi({
+        logger: false,
+
+        getFlightHistory:
+          () => [record],
+      });
+
+      const response =
+        await app.inject({
+          method: "GET",
+          url:
+            "/api/v1/assets/nvda-asset-id/history",
+        });
+
+      expect(
+        response.statusCode,
+      ).toBe(200);
+
+      const body =
+        response.json();
+
+      expect(
+        body.asset,
+      ).toEqual({
+        symbol: "NVDA",
+        assetId:
+          "nvda-asset-id",
+      });
+
+      expect(
+        body.recordVersion,
+      ).toBe(1);
+
+      expect(
+        body.count,
+      ).toBe(1);
+
+      expect(
+        body.records[0]
+          .recordedAt,
+      ).toBe(
+        "2026-09-07T02:00:00.000Z",
+      );
+
+      expect(
+        body.records[0]
+          .transition,
+      ).toEqual({
+        status:
+          "BASELINE_ESTABLISHED",
+        changed: null,
+        changeTypes: [],
+        scoreDelta: null,
+        severity: {
+          previous: null,
+          current: null,
+          changed: false,
+        },
+        disorders: {
+          activated: [],
+          cleared: [],
+        },
+      });
+
+      expect(
+        body.records[0]
+          .evidence
+          .disorders[0]
+          .reason,
+      ).toBe(
+        "Evidence captured at the first observation.",
+      );
+
+      expect(
+        body.records[0]
+          .observations,
+      ).toBeUndefined();
+
+      await app.close();
+    },
+  );
+
+  it(
+    "presents recorded evolution chronologically with the captured State Diff and Evidence DNA",
+    async () => {
+      const first =
+        flightRecord(
+          "2026-09-07T02:00:00.000Z",
+          {
+            status:
+              "BASELINE_ESTABLISHED",
+            asset: {
+              symbol: "NVDA",
+              assetId:
+                "nvda-asset-id",
+            },
+            diff: null,
+          },
+          0,
+          "Evidence from observation one.",
+        );
+
+      const second =
+        flightRecord(
+          "2026-09-07T02:01:00.000Z",
+          {
+            status:
+              "DIFF_AVAILABLE",
+            asset: {
+              symbol: "NVDA",
+              assetId:
+                "nvda-asset-id",
+            },
+            diff: {
+              changed: true,
+              changeTypes: [
+                "SCORE_CHANGED",
+                "SEVERITY_CHANGED",
+                "DISORDER_ACTIVATED",
+              ],
+              score: {
+                previous: 0,
+                current: 65,
+                delta: 65,
+                changed: true,
+              },
+              severity: {
+                previous:
+                  MADSeverity.NORMAL,
+                current:
+                  MADSeverity.HIGH,
+                changed: true,
+              },
+              disorders: {
+                activated: [7],
+                cleared: [],
+                previousActive: [],
+                currentActive: [7],
+                changed: true,
+              },
+              assessment: {} as any,
+              multiplier: {} as any,
+              marketAvailability:
+                {} as any,
+            },
+          },
+          65,
+          "Evidence from observation two.",
+        );
+
+      const app = createMADApi({
+        logger: false,
+
+        getFlightHistory:
+          () => [
+            first,
+            second,
+          ],
+      });
+
+      const response =
+        await app.inject({
+          method: "GET",
+          url:
+            "/api/v1/assets/nvda-asset-id/history",
+        });
+
+      expect(
+        response.statusCode,
+      ).toBe(200);
+
+      const body =
+        response.json();
+
+      expect(
+        body.count,
+      ).toBe(2);
+
+      expect(
+        body.records.map(
+          (
+            record: {
+              recordedAt: string;
+            },
+          ) =>
+            record.recordedAt,
+        ),
+      ).toEqual([
+        "2026-09-07T02:00:00.000Z",
+        "2026-09-07T02:01:00.000Z",
+      ]);
+
+      expect(
+        body.records[1]
+          .transition,
+      ).toMatchObject({
+        status:
+          "DIFF_AVAILABLE",
+        changed: true,
+        changeTypes: [
+          "SCORE_CHANGED",
+          "SEVERITY_CHANGED",
+          "DISORDER_ACTIVATED",
+        ],
+        scoreDelta: 65,
+        severity: {
+          previous:
+            MADSeverity.NORMAL,
+          current:
+            MADSeverity.HIGH,
+          changed: true,
+        },
+        disorders: {
+          activated: [7],
+          cleared: [],
+        },
+      });
+
+      expect(
+        body.records[0]
+          .evidence
+          .disorders[0]
+          .reason,
+      ).toBe(
+        "Evidence from observation one.",
+      );
+
+      expect(
+        body.records[1]
+          .evidence
+          .disorders[0]
+          .reason,
+      ).toBe(
+        "Evidence from observation two.",
+      );
+
+      await app.close();
+    },
+  );
 
 });

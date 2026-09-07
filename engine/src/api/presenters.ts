@@ -338,3 +338,135 @@ export function presentMADRadarSnapshot(
       ),
   };
 }
+
+import type {
+  MADFlightRecord,
+} from "../engine/madFlightRecorder.js";
+
+function presentMADFlightTransition(
+  transition: MADFlightRecord["transition"],
+) {
+  if (
+    transition.status ===
+    "BASELINE_ESTABLISHED"
+  ) {
+    return {
+      status:
+        "BASELINE_ESTABLISHED" as const,
+      changed: null,
+      changeTypes: [],
+      scoreDelta: null,
+      severity: {
+        previous: null,
+        current: null,
+        changed: false,
+      },
+      disorders: {
+        activated: [],
+        cleared: [],
+      },
+    };
+  }
+
+  const diff = transition.diff;
+
+  if (!diff) {
+    return {
+      status:
+        "DIFF_AVAILABLE" as const,
+      changed: null,
+      changeTypes: [],
+      scoreDelta: null,
+      severity: {
+        previous: null,
+        current: null,
+        changed: false,
+      },
+      disorders: {
+        activated: [],
+        cleared: [],
+      },
+    };
+  }
+
+  return {
+    status:
+      "DIFF_AVAILABLE" as const,
+    changed:
+      diff.changed,
+    changeTypes:
+      diff.changeTypes,
+    scoreDelta:
+      diff.score.delta,
+    severity: {
+      previous:
+        diff.severity.previous,
+      current:
+        diff.severity.current,
+      changed:
+        diff.severity.changed,
+    },
+    disorders: {
+      activated:
+        diff.disorders.activated,
+      cleared:
+        diff.disorders.cleared,
+    },
+  };
+}
+
+export function presentMADFlightHistory(
+  records: readonly MADFlightRecord[],
+) {
+  const first =
+    records[0];
+
+  return {
+    asset:
+      first
+        ? {
+            symbol:
+              first.asset.symbol,
+            assetId:
+              first.asset.assetId,
+          }
+        : null,
+
+    recordVersion:
+      first?.recordVersion ?? 1,
+
+    count:
+      records.length,
+
+    records:
+      records.map(
+        (record) => ({
+          recordedAt:
+            record.recordedAt,
+
+          mad: {
+            score:
+              record.mad.score,
+            severityCode:
+              record.mad.severity,
+            severity:
+              severityName(
+                record.mad.severity,
+              ),
+            activeDisorders:
+              record.mad.activeDisorders,
+          },
+
+          transition:
+            presentMADFlightTransition(
+              record.transition,
+            ),
+
+          evidence:
+            presentMADEvidenceDNA(
+              record.evidence,
+            ),
+        }),
+      ),
+  };
+}
