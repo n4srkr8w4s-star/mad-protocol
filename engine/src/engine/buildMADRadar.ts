@@ -30,6 +30,11 @@ import {
   type RobinhoodUniverseScan,
 } from "./scanRobinhoodUniverse.js";
 
+import type {
+  MADStateTracker,
+  MADStateTrackingResult,
+} from "./madStateTracker.js";
+
 export type MADRadarStateStatus =
   | "ASSESSED"
   | "CAPABILITY_ONLY"
@@ -79,6 +84,9 @@ export interface MADRadarAsset {
       MADRadarActiveDisorder[];
   } | null;
 
+  transition:
+    MADStateTrackingResult | null;
+
   reason: string | null;
 }
 
@@ -123,6 +131,9 @@ export interface MADRadarDependencies {
 
   evaluateComposite?:
     typeof evaluateRobinhoodCompositeState;
+
+  stateTracker?:
+    MADStateTracker;
 
   now?: () => Date;
 
@@ -298,6 +309,15 @@ export async function buildMADRadar(
               },
             );
 
+          /*
+           * Only successfully evaluated FULL assets
+           * advance State Diff memory.
+           */
+          const transition =
+            dependencies.stateTracker
+              ?.observe(composite) ??
+            null;
+
           return {
             symbol:
               capability.symbol,
@@ -388,6 +408,7 @@ export async function buildMADRadar(
                   ),
             },
 
+            transition,
             reason: null,
           } satisfies MADRadarAsset;
         } catch (error) {
@@ -429,6 +450,7 @@ export async function buildMADRadar(
               "ERROR" as const,
 
             state: null,
+            transition: null,
 
             reason:
               error instanceof Error
@@ -489,6 +511,7 @@ export async function buildMADRadar(
             "CAPABILITY_ONLY",
 
           state: null,
+          transition: null,
 
           reason:
             capability.capability ===

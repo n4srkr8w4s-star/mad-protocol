@@ -5,6 +5,10 @@ import {
   type MADRadarSnapshot,
 } from "./buildMADRadar.js";
 
+import {
+  createMADStateTracker,
+} from "./madStateTracker.js";
+
 export interface MADRadarSnapshotProviderOptions {
   ttlMs?: number;
 
@@ -48,6 +52,16 @@ export function createMADRadarSnapshotProvider(
     options.buildSnapshot ??
     buildMADRadar;
 
+  /*
+   * State Diff memory lives for the lifetime
+   * of this Radar snapshot provider.
+   *
+   * Cache hits do not advance the baseline.
+   * Only genuine Radar rebuilds can.
+   */
+  const stateTracker =
+    createMADStateTracker();
+
   let cached:
     | {
         snapshot:
@@ -89,7 +103,13 @@ export function createMADRadarSnapshotProvider(
     inFlight =
       buildSnapshot(
         input,
-        dependencies,
+        {
+          ...dependencies,
+          stateTracker:
+            dependencies
+              ?.stateTracker ??
+            stateTracker,
+        },
       )
         .then(
           (snapshot) => {
