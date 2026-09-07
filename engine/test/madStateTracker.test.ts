@@ -283,6 +283,41 @@ describe(
     );
 
     it(
+      "can restore a persisted baseline before observing",
+      () => {
+        const tracker =
+          createMADStateTracker();
+
+        tracker.restoreBaseline(
+          state(
+            "aapl-id",
+            "AAPL",
+            25,
+          ),
+        );
+
+        const result =
+          tracker.observe(
+            state(
+              "aapl-id",
+              "AAPL",
+              50,
+            ),
+          );
+
+        expect(
+          result.status,
+        ).toBe(
+          "DIFF_AVAILABLE",
+        );
+
+        expect(
+          result.diff?.score.delta,
+        ).toBe(25);
+      },
+    );
+
+    it(
       "can clear one asset without clearing others",
       () => {
         const tracker =

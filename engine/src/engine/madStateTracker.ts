@@ -26,6 +26,16 @@ export interface MADStateTracker {
     assetId: string,
   ): RobinhoodCompositeState | undefined;
 
+  restoreBaseline(
+    state: RobinhoodCompositeState,
+  ): void;
+
+  replaceBaseline(
+    assetId: string,
+    state:
+      RobinhoodCompositeState | undefined,
+  ): void;
+
   clear(
     assetId?: string,
   ): void;
@@ -103,6 +113,42 @@ export function createMADStateTracker(): MADStateTracker {
     );
   }
 
+  function restoreBaseline(
+    state: RobinhoodCompositeState,
+  ) {
+    baselines.set(
+      state.asset.assetId,
+      state,
+    );
+  }
+
+  function replaceBaseline(
+    assetId: string,
+    state:
+      RobinhoodCompositeState | undefined,
+  ) {
+    if (state === undefined) {
+      baselines.delete(
+        assetId,
+      );
+      return;
+    }
+
+    if (
+      state.asset.assetId !==
+      assetId
+    ) {
+      throw new Error(
+        "MAD State Tracker cannot restore a baseline for a different asset.",
+      );
+    }
+
+    baselines.set(
+      assetId,
+      state,
+    );
+  }
+
   function clear(
     assetId?: string,
   ) {
@@ -123,6 +169,8 @@ export function createMADStateTracker(): MADStateTracker {
   return {
     observe,
     getBaseline,
+    restoreBaseline,
+    replaceBaseline,
     clear,
     size,
   };

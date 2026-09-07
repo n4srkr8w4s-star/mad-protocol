@@ -143,6 +143,18 @@ export interface MADRadarDependencies {
   flightRecorder?:
     MADFlightRecorder;
 
+  commitObservation?: (
+    composite:
+      Awaited<
+        ReturnType<
+          typeof evaluateRobinhoodCompositeState
+        >
+      >,
+    transition:
+      MADStateTrackingResult,
+    recordedAt: Date,
+  ) => void;
+
   now?: () => Date;
 
 }
@@ -321,8 +333,17 @@ export async function buildMADRadar(
            * Only successfully evaluated FULL assets
            * advance State Diff memory.
            */
+          const tracker =
+            dependencies.stateTracker;
+
+          const previousBaseline =
+            tracker
+              ?.getBaseline(
+                composite.asset.assetId,
+              );
+
           const transition =
-            dependencies.stateTracker
+            tracker
               ?.observe(composite) ??
             null;
 
@@ -334,17 +355,38 @@ export async function buildMADRadar(
            * It never creates an independent
            * transition or observation sequence.
            */
-          if (
-            transition &&
-            dependencies.flightRecorder
-          ) {
-            dependencies.flightRecorder.append(
-              buildMADFlightRecord(
-                composite,
-                transition,
-                now(),
-              ),
-            );
+          if (transition) {
+            const recordedAt =
+              now();
+
+            if (
+              dependencies.commitObservation
+            ) {
+              try {
+                dependencies.commitObservation(
+                  composite,
+                  transition,
+                  recordedAt,
+                );
+              } catch (error) {
+                tracker?.replaceBaseline(
+                  composite.asset.assetId,
+                  previousBaseline,
+                );
+
+                throw error;
+              }
+            } else if (
+              dependencies.flightRecorder
+            ) {
+              dependencies.flightRecorder.append(
+                buildMADFlightRecord(
+                  composite,
+                  transition,
+                  recordedAt,
+                ),
+              );
+            }
           }
 
           return {

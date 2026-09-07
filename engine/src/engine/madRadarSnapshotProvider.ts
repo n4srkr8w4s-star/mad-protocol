@@ -7,12 +7,18 @@ import {
 
 import {
   createMADStateTracker,
+  type MADStateTracker,
 } from "./madStateTracker.js";
 
 import {
+  buildMADFlightRecord,
   createInMemoryMADFlightRecorder,
   type MADFlightRecord,
 } from "./madFlightRecorder.js";
+
+import {
+  createFileMADObservationStore,
+} from "./madObservationStore.js";
 
 export interface MADRadarSnapshotProviderOptions {
   ttlMs?: number;
@@ -23,6 +29,8 @@ export interface MADRadarSnapshotProviderOptions {
     input: MADRadarInput,
     dependencies?: MADRadarDependencies,
   ) => Promise<MADRadarSnapshot>;
+
+  observationStorePath?: string;
 }
 
 export interface MADRadarSnapshotProvider {
@@ -78,6 +86,98 @@ export function createMADRadarSnapshotProvider(
   const flightRecorder =
     createInMemoryMADFlightRecorder();
 
+  const observationStore =
+    options.observationStorePath
+      ? createFileMADObservationStore(
+          options.observationStorePath,
+        )
+      : undefined;
+
+  /*
+   * The durable-aware tracker restores
+   * the last-good baseline before the
+   * first observation for an asset after
+   * process restart.
+   */
+  const durableStateTracker:
+    MADStateTracker =
+    observationStore
+      ? {
+          observe(state) {
+            const assetId =
+              state.asset.assetId;
+
+            if (
+              !stateTracker.getBaseline(
+                assetId,
+              )
+            ) {
+              const persisted =
+                observationStore
+                  .getBaseline(
+                    assetId,
+                  );
+
+              if (persisted) {
+                stateTracker
+                  .restoreBaseline(
+                    persisted,
+                  );
+              }
+            }
+
+            return stateTracker
+              .observe(state);
+          },
+
+          getBaseline(assetId) {
+            return (
+              stateTracker
+                .getBaseline(
+                  assetId,
+                ) ??
+              observationStore
+                .getBaseline(
+                  assetId,
+                )
+            );
+          },
+
+          restoreBaseline(state) {
+            stateTracker
+              .restoreBaseline(
+                state,
+              );
+          },
+
+          replaceBaseline(
+            assetId,
+            state,
+          ) {
+            stateTracker
+              .replaceBaseline(
+                assetId,
+                state,
+              );
+          },
+
+          clear(assetId) {
+            /*
+             * Provider lifecycle clearing
+             * must not erase durable MAD
+             * intelligence.
+             */
+            stateTracker.clear(
+              assetId,
+            );
+          },
+
+          size() {
+            return stateTracker.size();
+          },
+        }
+      : stateTracker;
+
   let cached:
     | {
         snapshot:
@@ -124,12 +224,43 @@ export function createMADRadarSnapshotProvider(
           stateTracker:
             dependencies
               ?.stateTracker ??
-            stateTracker,
+            durableStateTracker,
 
           flightRecorder:
             dependencies
               ?.flightRecorder ??
             flightRecorder,
+
+          commitObservation:
+            dependencies
+              ?.commitObservation ??
+            (
+              observationStore
+                ? (
+                    composite,
+                    transition,
+                    recordedAt,
+                  ) => {
+                    const record =
+                      buildMADFlightRecord(
+                        composite,
+                        transition,
+                        recordedAt,
+                      );
+
+                    observationStore
+                      .commitObservation(
+                        composite,
+                        record,
+                      );
+
+                    flightRecorder.append(
+                      record,
+                    );
+
+                  }
+                : undefined
+            ),
         },
       )
         .then(
@@ -155,6 +286,12 @@ export function createMADRadarSnapshotProvider(
   function history(
     assetId: string,
   ) {
+    if (observationStore) {
+      return observationStore.history(
+        assetId,
+      );
+    }
+
     return flightRecorder.history(
       assetId,
     );
