@@ -346,10 +346,24 @@ export function createMADApi(
        * Reading history must never trigger
        * a new market evaluation.
        */
-      const records =
+      let records =
         getFlightHistory(
           identifier,
         );
+
+      if (records.length === 0) {
+        const capability =
+          await resolveCapability(
+            identifier,
+          );
+
+        if (capability) {
+          records =
+            getFlightHistory(
+              capability.assetId,
+            );
+        }
+      }
 
       return presentMADFlightHistory(
         records,
@@ -599,6 +613,10 @@ export function createMADApi(
               .ROBINHOOD_MAINNET_RPC ??
             "https://rpc.mainnet.chain.robinhood.com",
         });
+
+      radarProvider.recordObservation(
+        composite,
+      );
 
       const state =
         presentRobinhoodCompositeState(

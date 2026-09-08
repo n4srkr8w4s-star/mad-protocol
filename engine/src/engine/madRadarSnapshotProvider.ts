@@ -8,6 +8,7 @@ import {
 import {
   createMADStateTracker,
   type MADStateTracker,
+  type MADStateTrackingResult,
 } from "./madStateTracker.js";
 
 import {
@@ -19,6 +20,10 @@ import {
 import {
   createFileMADObservationStore,
 } from "./madObservationStore.js";
+
+import type {
+  RobinhoodCompositeState,
+} from "./diffMADState.js";
 
 export interface MADRadarSnapshotProviderOptions {
   ttlMs?: number;
@@ -42,6 +47,9 @@ export interface MADRadarSnapshotProvider {
     assetId: string,
   ): readonly MADFlightRecord[];
 
+  recordObservation(
+    composite: RobinhoodCompositeState,
+  ): MADStateTrackingResult;
 
   clear(): void;
 }
@@ -296,6 +304,55 @@ export function createMADRadarSnapshotProvider(
       assetId,
     );
   }
+  function recordObservation(
+    composite: RobinhoodCompositeState,
+  ): MADStateTrackingResult {
+    const assetId =
+      composite.asset.assetId;
+
+    const previousBaseline =
+      durableStateTracker.getBaseline(
+        assetId,
+      );
+
+    const transition =
+      durableStateTracker.observe(
+        composite,
+      );
+
+    const recordedAt =
+      new Date(nowMs());
+
+    const record =
+      buildMADFlightRecord(
+        composite,
+        transition,
+        recordedAt,
+      );
+
+    try {
+      if (observationStore) {
+        observationStore.commitObservation(
+          composite,
+          record,
+        );
+      }
+
+      flightRecorder.append(
+        record,
+      );
+    } catch (error) {
+      durableStateTracker.replaceBaseline(
+        assetId,
+        previousBaseline,
+      );
+
+      throw error;
+    }
+
+    return transition;
+  }
+
 
 
   function clear() {
@@ -305,6 +362,8 @@ export function createMADRadarSnapshotProvider(
   return {
     getSnapshot,
     history,
+    recordObservation,
+
     clear,
   };
 }
