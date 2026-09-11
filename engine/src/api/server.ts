@@ -23,6 +23,10 @@ import {
 } from "../engine/buildEvidenceDNA.js";
 
 import {
+  buildAssessmentIntegrity,
+} from "../engine/buildAssessmentIntegrity.js";
+
+import {
   resolveRobinhoodCapability,
   type RobinhoodAssetCapability,
 } from "../engine/resolveRobinhoodCapability.js";
@@ -60,6 +64,7 @@ type ApiAssetCapability =
     | "capability"
     | "supportedDisorders"
     | "totalDisorders"
+    | "disorders"
   >;
 
 export interface MADApiDependencies {
@@ -618,6 +623,12 @@ export function createMADApi(
         composite,
       );
 
+      const integrity =
+        buildAssessmentIntegrity(
+          composite,
+          capability,
+        );
+
       const state =
         presentRobinhoodCompositeState(
           composite,
@@ -640,6 +651,7 @@ export function createMADApi(
 
       return {
         ...state,
+        integrity,
         evidence,
       };
     },

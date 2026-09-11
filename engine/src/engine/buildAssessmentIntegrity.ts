@@ -45,7 +45,10 @@ interface UnassessedOutcome {
 
 export function buildAssessmentCoverage(
   composite: RobinhoodCompositeState,
-  capability: RobinhoodAssetCapability,
+  capability: Pick<
+    RobinhoodAssetCapability,
+    "disorders"
+  >,
 ): MADAssessmentCoverage {
   const assessedIds = new Set(
     composite.disorders.assessed.map(
@@ -483,7 +486,10 @@ export interface MADAssessmentIntegrity {
 
 export function buildAssessmentIntegrity(
   composite: RobinhoodCompositeState,
-  capability: RobinhoodAssetCapability,
+  capability: Pick<
+    RobinhoodAssetCapability,
+    "disorders"
+  >,
   robinhoodPrices?:
     RobinhoodPriceSourceHealth,
 ): MADAssessmentIntegrity {

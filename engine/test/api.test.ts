@@ -6,6 +6,7 @@ import {
 } from "vitest";
 
 import {
+  ActiveDisorderId,
   MADSeverity,
 } from "../src/domain/types.js";
 
@@ -979,6 +980,32 @@ describe("MAD API", () => {
               "FULL",
             supportedDisorders: 4,
             totalDisorders: 4,
+            disorders: [
+              {
+                id: ActiveDisorderId.UNDERLYING_TRADING_HALT,
+                code: "UNDERLYING_TRADING_HALT",
+                supported: true,
+                reason: "Supported for test.",
+              },
+              {
+                id: ActiveDisorderId.MULTIPLIER_TRANSITION,
+                code: "MULTIPLIER_TRANSITION",
+                supported: true,
+                reason: "Supported for test.",
+              },
+              {
+                id: ActiveDisorderId.REFERENCE_DATA_STALE,
+                code: "REFERENCE_DATA_STALE",
+                supported: true,
+                reason: "Supported for test.",
+              },
+              {
+                id: ActiveDisorderId.ORACLE_DEVIATION,
+                code: "ORACLE_DEVIATION",
+                supported: true,
+                reason: "Supported for test.",
+              },
+            ],
           };
         },
 
@@ -1064,11 +1091,54 @@ describe("MAD API", () => {
         chainId: 4663,
       },
 
-      observations:
-        {} as CompositeResult["observations"],
+      observations: {
+        timing: {
+          evaluationTimeUnix: "1789113600",
+          robinhoodPriceGeneratedAtUnix: "1789113598",
+          oracleUpdatedAtUnix: "1789113570",
+          robinhoodPriceAgeSeconds: 2,
+          oracleAgeSeconds: 30,
+          sourceSkewSeconds: 28,
+        },
+
+        oracle: {
+          feedAddress:
+            "0x0000000000000000000000000000000000000001",
+          description:
+            "Robinhood NVDA / USD",
+          decimals: 8,
+          answer: "10000000000",
+          updatedAtUnix: "1789113570",
+          priceE18:
+            "100000000000000000000",
+          heartbeatSeconds: 86400,
+          marketAvailability: "OPEN",
+        },
+      } as CompositeResult["observations"],
 
       disorders: {
-        assessed: [],
+        assessed: [
+          {
+            id: ActiveDisorderId.UNDERLYING_TRADING_HALT,
+            code: "UNDERLYING_TRADING_HALT",
+            evaluation: {},
+          },
+          {
+            id: ActiveDisorderId.MULTIPLIER_TRANSITION,
+            code: "MULTIPLIER_TRANSITION",
+            evaluation: {},
+          },
+          {
+            id: ActiveDisorderId.REFERENCE_DATA_STALE,
+            code: "REFERENCE_DATA_STALE",
+            evaluation: {},
+          },
+          {
+            id: ActiveDisorderId.ORACLE_DEVIATION,
+            code: "ORACLE_DEVIATION",
+            evaluation: {},
+          },
+        ],
         unassessed: [],
       },
 
@@ -1102,6 +1172,32 @@ describe("MAD API", () => {
               "FULL",
             supportedDisorders: 4,
             totalDisorders: 4,
+            disorders: [
+              {
+                id: ActiveDisorderId.UNDERLYING_TRADING_HALT,
+                code: "UNDERLYING_TRADING_HALT",
+                supported: true,
+                reason: "Supported for test.",
+              },
+              {
+                id: ActiveDisorderId.MULTIPLIER_TRANSITION,
+                code: "MULTIPLIER_TRANSITION",
+                supported: true,
+                reason: "Supported for test.",
+              },
+              {
+                id: ActiveDisorderId.REFERENCE_DATA_STALE,
+                code: "REFERENCE_DATA_STALE",
+                supported: true,
+                reason: "Supported for test.",
+              },
+              {
+                id: ActiveDisorderId.ORACLE_DEVIATION,
+                code: "ORACLE_DEVIATION",
+                supported: true,
+                reason: "Supported for test.",
+              },
+            ],
           };
         },
 
