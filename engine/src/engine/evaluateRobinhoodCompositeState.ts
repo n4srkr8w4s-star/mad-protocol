@@ -105,6 +105,10 @@ export interface RobinhoodCompositeDependencies {
   resolveFeedMetadata?: FeedMetadataResolver;
 }
 
+export type MADUnassessedDisposition =
+  | "NOT_APPLICABLE"
+  | "EVIDENCE_UNAVAILABLE";
+
 export async function evaluateRobinhoodCompositeState(
   input: {
     symbol: string;
@@ -522,6 +526,10 @@ export async function evaluateRobinhoodCompositeState(
                   ActiveDisorderId.ORACLE_DEVIATION,
                 code:
                   "ORACLE_DEVIATION",
+                disposition:
+                  marketAvailability === "CLOSED"
+                    ? "NOT_APPLICABLE"
+                    : "EVIDENCE_UNAVAILABLE",
                 reason:
                   marketAvailability === "CLOSED"
                     ? "Reference market is closed; oracle deviation is not assessed."
@@ -532,6 +540,7 @@ export async function evaluateRobinhoodCompositeState(
       ) as Array<{
         id: ActiveDisorderId;
         code: string;
+        disposition: MADUnassessedDisposition;
         reason: string;
       }>,
     },
